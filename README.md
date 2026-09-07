@@ -1,0 +1,41 @@
+# ssher — SSH client for Daylight DC-1
+
+Native Kotlin / Jetpack Compose SSH client aimed at Daylight's greyscale Live Paper display.
+Password auth via pure Java [sshj](https://github.com/hierynomus/sshj). Sideload the APK (no Play Store).
+
+## Features (v0.1)
+
+- Saved hosts (name, host, port, user) — passwords are not stored
+- Password authentication
+- Interactive shell with line input, Enter / Ctrl+C / Ctrl+D
+- High-contrast greyscale UI
+
+## Build
+
+Requires JDK 17+ and Android SDK (platform 34).
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+./gradlew :app:assembleDebug
+```
+
+APK output:
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Sideload on DC-1
+
+1. Enable install from unknown sources / ADB debugging on the device.
+2. Copy the APK over USB, network, or:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+## Notes
+
+- Host keys are currently accepted without pinning (convenient for first use; tighten later).
+- Terminal is line-oriented with ANSI stripped for paper readability — not a full curses emulator yet.

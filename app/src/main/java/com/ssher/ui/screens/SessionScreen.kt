@@ -1,24 +1,18 @@
 package com.ssher.ui.screens
 
-import androidx.compose.foundation.background
+import android.graphics.Typeface
+import android.view.ViewGroup
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,33 +27,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ssher.terminal.SsherTerminalClients
 import com.ssher.ui.SessionViewModel
+import com.termux.terminal.TerminalColors
+import com.termux.terminal.TerminalSession
+import com.termux.view.TerminalView
+import com.termux.view.TerminalViewClient
+import java.util.Properties
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(
     hostId: String,
@@ -74,9 +62,8 @@ fun SessionScreen(
     val state = viewModel.uiState
     var passwordPromptOpen by remember { mutableStateOf(false) }
     var resolvingPassword by remember { mutableStateOf(true) }
-    var input by remember { mutableStateOf("") }
-    val scroll = rememberScrollState()
-    val inputFocus = remember { FocusRequester() }
+    var sessionPassword by remember { mutableStateOf<String?>(null) }
+    var connectionId by remember { mutableIntStateOf(0) }
 
     DisposableEffect(Unit) {
         onDispose { viewModel.disconnect() }
@@ -84,24 +71,23 @@ fun SessionScreen(
 
     LaunchedEffect(hostId) {
         resolvingPassword = true
+        viewModel.disconnect()
         val saved = loadPassword(hostId)
         if (!saved.isNullOrEmpty()) {
+            sessionPassword = saved
             passwordPromptOpen = false
-            viewModel.connect(host, port, username, saved)
+            connectionId++
         } else {
+            sessionPassword = null
             passwordPromptOpen = true
         }
         resolvingPassword = false
     }
 
-    LaunchedEffect(state.output) {
-        scroll.animateScrollTo(scroll.maxValue)
-    }
-
-    LaunchedEffect(state.connected) {
-        if (state.connected) {
-            inputFocus.requestFocus()
-        }
+    fun startWithPassword(value: String) {
+        sessionPassword = value
+        passwordPromptOpen = false
+        connectionId++
     }
 
     Scaffold(
@@ -130,8 +116,10 @@ fun SessionScreen(
                 actions = {
                     TextButton(
                         onClick = {
-                            if (state.connected || state.connecting) {
+                            if (sessionPassword != null && !passwordPromptOpen) {
                                 viewModel.disconnect()
+                                sessionPassword = null
+                                passwordPromptOpen = true
                             } else {
                                 passwordPromptOpen = true
                             }
@@ -141,7 +129,7 @@ fun SessionScreen(
                         Text(
                             when {
                                 state.connecting -> "Cancel"
-                                state.connected -> "Disconnect"
+                                sessionPassword != null && !passwordPromptOpen -> "Disconnect"
                                 else -> "Connect"
                             },
                         )
@@ -153,139 +141,110 @@ fun SessionScreen(
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.surface),
-        ) {
-            SelectionContainer(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(scroll)
-                    .padding(12.dp),
-            ) {
-                Text(
-                    text = buildString {
-                        when {
-                            resolvingPassword -> append("Loading credentials…\n")
-                            else -> {
-                                append(state.output)
-                                state.error?.let { append("\nError: $it\n") }
+        val password = sessionPassword
+        if (!resolvingPassword && password != null && !passwordPromptOpen) {
+            key(connectionId) {
+                AndroidView(
+                    factory = { ctx ->
+                        val view = TerminalView(ctx, null).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                            )
+                            setTextSize(15)
+                            setTypeface(Typeface.MONOSPACE)
+                            isFocusable = true
+                            isFocusableInTouchMode = true
+                        }
+                        val baseClients = SsherTerminalClients(
+                            context = ctx,
+                            terminalView = view,
+                            onSessionFinished = { viewModel.markDisconnected() },
+                        )
+                        lateinit var session: TerminalSession
+                        val viewClient = object : TerminalViewClient by baseClients {
+                            override fun onEmulatorSet() {
+                                applyPaperScheme(session)
+                                baseClients.onEmulatorSet()
+                                view.requestFocus()
                             }
                         }
-                    }.ifBlank { "Waiting to connect…" },
-                    style = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
+                        view.setTerminalViewClient(viewClient)
+                        session = viewModel.createSession(
+                            host = host,
+                            port = port,
+                            username = username,
+                            password = password,
+                            client = baseClients,
+                        )
+                        view.attachSession(session)
+                        view
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    update = { view ->
+                        if (!view.hasFocus()) view.requestFocus()
+                    },
                 )
             }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
-
-            Row(
+        } else {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(24.dp),
             ) {
                 Text(
-                    "> ",
-                    style = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                )
-                BasicTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    enabled = state.connected,
-                    singleLine = true,
-                    textStyle = TextStyle(
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                    cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(
-                        onSend = {
-                            if (input.isNotEmpty() || state.connected) {
-                                viewModel.send(input + "\n")
-                                input = ""
-                            }
-                        },
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(inputFocus)
-                        // Keep Tab in the terminal — don't let Compose move focus.
-                        .focusProperties {
-                            next = FocusRequester.Cancel
-                            previous = FocusRequester.Cancel
-                        }
-                        .onPreviewKeyEvent { event ->
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                            when {
-                                event.key == Key.Tab -> {
-                                    // Flush typed line + Tab so remote shells can do completion.
-                                    viewModel.send(input + "\t")
-                                    input = ""
-                                    true
-                                }
-                                event.key == Key.Enter -> {
-                                    viewModel.send(input + "\n")
-                                    input = ""
-                                    true
-                                }
-                                event.isCtrlPressed && event.key == Key.C -> {
-                                    viewModel.sendRaw("\u0003")
-                                    true
-                                }
-                                event.isCtrlPressed && event.key == Key.D -> {
-                                    viewModel.sendRaw("\u0004")
-                                    true
-                                }
-                                event.isCtrlPressed && event.key == Key.L -> {
-                                    true
-                                }
-                                else -> false
-                            }
-                        },
-                )
-                TextButton(
-                    onClick = {
-                        viewModel.send(input + "\n")
-                        input = ""
+                    when {
+                        resolvingPassword -> "Loading credentials…"
+                        passwordPromptOpen -> "Enter password to connect"
+                        else -> state.error ?: "Waiting…"
                     },
-                    enabled = state.connected,
-                    modifier = Modifier.focusProperties { canFocus = false },
-                ) {
-                    Text("Send")
-                }
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
     }
 
-    if (passwordPromptOpen && !state.connected && !state.connecting && !resolvingPassword) {
+    if (passwordPromptOpen && !resolvingPassword) {
         PasswordDialog(
             username = username,
             host = host,
             onDismiss = {
                 passwordPromptOpen = false
-                if (!state.connected) onBack()
+                if (sessionPassword == null) onBack()
             },
-            onConnect = { password ->
-                passwordPromptOpen = false
-                viewModel.connect(host, port, username, password)
-            },
+            onConnect = { startWithPassword(it) },
         )
     }
+}
+
+private fun applyPaperScheme(session: TerminalSession) {
+    val emulator = session.emulator ?: return
+    val props = Properties().apply {
+        setProperty("foreground", "#000000")
+        setProperty("background", "#FFFFFF")
+        setProperty("cursor", "#000000")
+        setProperty("color0", "#000000")
+        setProperty("color1", "#444444")
+        setProperty("color2", "#555555")
+        setProperty("color3", "#666666")
+        setProperty("color4", "#777777")
+        setProperty("color5", "#888888")
+        setProperty("color6", "#999999")
+        setProperty("color7", "#BBBBBB")
+        setProperty("color8", "#333333")
+        setProperty("color9", "#555555")
+        setProperty("color10", "#666666")
+        setProperty("color11", "#777777")
+        setProperty("color12", "#888888")
+        setProperty("color13", "#999999")
+        setProperty("color14", "#AAAAAA")
+        setProperty("color15", "#000000")
+    }
+    TerminalColors.COLOR_SCHEME.updateWith(props)
+    emulator.mColors.reset()
 }
 
 @Composable

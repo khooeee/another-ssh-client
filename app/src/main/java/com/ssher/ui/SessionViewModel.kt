@@ -4,79 +4,53 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.ssher.ssh.SshSession
-import kotlinx.coroutines.launch
+import com.ssher.ssh.SshTransport
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
 
 data class SessionUiState(
     val connecting: Boolean = false,
     val connected: Boolean = false,
-    val output: String = "",
     val error: String? = null,
 )
 
 class SessionViewModel : ViewModel() {
-    private val session = SshSession()
-
     var uiState by mutableStateOf(SessionUiState())
         private set
 
-    fun connect(host: String, port: Int, username: String, password: String) {
-        if (uiState.connecting || uiState.connected) return
-        uiState = SessionUiState(connecting = true, output = "Connecting to $host:$port…\n")
-        viewModelScope.launch {
-            runCatching {
-                session.connect(
-                    host = host,
-                    port = port,
-                    username = username,
-                    password = password,
-                    onOutput = { chunk ->
-                        uiState = uiState.copy(
-                            connecting = false,
-                            connected = true,
-                            output = (uiState.output + chunk).takeLast(100_000),
-                            error = null,
-                        )
-                    },
-                    onClosed = { reason ->
-                        val suffix = reason?.let { "\n[disconnected] $it\n" } ?: "\n[disconnected]\n"
-                        uiState = uiState.copy(
-                            connecting = false,
-                            connected = false,
-                            output = uiState.output + suffix,
-                        )
-                    },
-                )
-                uiState = uiState.copy(connecting = false, connected = true, error = null)
-            }.onFailure { error ->
-                uiState = SessionUiState(
-                    connecting = false,
-                    connected = false,
-                    output = uiState.output,
-                    error = error.message ?: "Connection failed",
-                )
-            }
-        }
+    var terminalSession: TerminalSession? = null
+        private set
+
+    fun createSession(
+        host: String,
+        port: Int,
+        username: String,
+        password: String,
+        client: TerminalSessionClient,
+    ): TerminalSession {
+        disconnect()
+        uiState = SessionUiState(connecting = true)
+        val transport = SshTransport(host, port, username, password)
+        val session = TerminalSession(transport, /* transcriptRows */ 2000, client)
+        terminalSession = session
+        // Mark connected once the transport has a chance to start; real readiness is when
+        // emulator receives data / user can type. updateSize() from TerminalView starts transport.
+        uiState = uiState.copy(connecting = false, connected = true, error = null)
+        return session
     }
 
-    fun send(line: String) {
-        if (!session.isOpen) return
-        session.write(line)
-    }
-
-    fun sendRaw(data: String) {
-        if (!session.isOpen) return
-        session.write(data)
+    fun markDisconnected() {
+        uiState = uiState.copy(connected = false, connecting = false)
     }
 
     fun disconnect() {
-        session.disconnect()
+        terminalSession?.finishIfRunning()
+        terminalSession = null
         uiState = uiState.copy(connected = false, connecting = false)
     }
 
     override fun onCleared() {
-        session.destroy()
+        disconnect()
         super.onCleared()
     }
 }

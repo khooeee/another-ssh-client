@@ -12,8 +12,8 @@ android {
         applicationId = "com.ssher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -70,6 +70,9 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("org.slf4j:slf4j-android:1.7.36")
+
+    // Termux VT emulator (Apache-2.0) — render/keys only; SSH stays sshj
+    implementation(project(":terminal-view"))
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

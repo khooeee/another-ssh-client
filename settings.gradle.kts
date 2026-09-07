@@ -19,3 +19,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "ssher"
 include(":app")
+include(":terminal-emulator")
+include(":terminal-view")

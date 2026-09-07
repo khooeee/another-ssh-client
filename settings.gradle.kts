@@ -17,7 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ssher"
+rootProject.name = "AnotherSSHClient"
 include(":app")
 include(":terminal-emulator")
 include(":terminal-view")

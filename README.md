@@ -1,4 +1,4 @@
-# SSHer — SSH client for Daylight DC-1
+# Another SSH Client — SSH for Daylight DC-1
 
 Native Kotlin / Jetpack Compose SSH client aimed at Daylight's greyscale Live Paper display.
 Password auth via pure Java [sshj](https://github.com/hierynomus/sshj). Terminal rendering via
@@ -42,6 +42,6 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## License
 
-SSHer app code is [MIT](LICENSE).
+Another SSH Client app code is [MIT](LICENSE).
 
 Vendored `terminal-emulator` / `terminal-view` modules are **Apache-2.0** (from [termux/termux-app](https://github.com/termux/termux-app), originally Android Terminal Emulator).

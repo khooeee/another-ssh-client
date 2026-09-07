@@ -64,7 +64,7 @@ fun HostListScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("SSHer", style = MaterialTheme.typography.headlineMedium)
+                        Text("Another SSH Client", style = MaterialTheme.typography.headlineMedium)
                         Text(
                             "SSH for Daylight",
                             style = MaterialTheme.typography.bodyMedium,

@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.anothersshclient.terminal.SsherTerminalClients
+import com.anothersshclient.terminal.AppTerminalClients
 import com.anothersshclient.ui.SessionViewModel
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
@@ -173,7 +173,7 @@ fun SessionScreen(
                             isFocusable = true
                             isFocusableInTouchMode = true
                         }
-                        val baseClients = SsherTerminalClients(
+                        val baseClients = AppTerminalClients(
                             context = ctx,
                             terminalView = view,
                             onSessionFinished = { leaveToHostList() },

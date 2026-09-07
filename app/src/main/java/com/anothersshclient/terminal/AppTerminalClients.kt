@@ -12,7 +12,7 @@ import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 
 /** Minimal Termux clients: keep focus on the terminal, route clipboard, ignore modifier extras. */
-class SsherTerminalClients(
+class AppTerminalClients(
     private val context: Context,
     private val terminalView: TerminalView,
     private val onSessionFinished: () -> Unit,

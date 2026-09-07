@@ -27,7 +27,7 @@ private object Routes {
 }
 
 @Composable
-fun SsherApp() {
+fun AnotherSshClientApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as android.app.Application }

@@ -16,7 +16,7 @@ class TerminalPreferences(context: Context) {
         const val MAX_FONT_SIZE = 48
         const val DEFAULT_FONT_SIZE = 15
 
-        private const val PREFS_NAME = "ssher_terminal"
+        private const val PREFS_NAME = "another_ssh_client_terminal"
         private const val KEY_FONT_SIZE = "font_size_sp"
     }
 }

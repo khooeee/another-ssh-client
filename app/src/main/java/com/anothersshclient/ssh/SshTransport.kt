@@ -83,7 +83,7 @@ class SshTransport(
                     terminalSession.onTransportFinished(1)
                 }
             }
-        }, "ssher-ssh-$host").start()
+        }, "another-ssh-client-$host").start()
     }
 
     override fun write(data: ByteArray, offset: Int, count: Int) {

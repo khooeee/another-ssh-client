@@ -82,7 +82,7 @@ private val PaperTypography = Typography(
 )
 
 @Composable
-fun SsherTheme(content: @Composable () -> Unit) {
+fun AnotherSshClientTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = PaperColorScheme,
         typography = PaperTypography,

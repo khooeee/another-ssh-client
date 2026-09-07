@@ -5,13 +5,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:name=".SsherApp"
+        android:name=".AnotherSshClientApplication"
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Ssher"
+        android:theme="@style/Theme.AnotherSshClient"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"

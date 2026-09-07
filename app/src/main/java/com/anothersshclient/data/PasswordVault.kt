@@ -89,9 +89,9 @@ class PasswordVault(context: Context) {
     private fun keyFor(hostId: String) = "pw_$hostId"
 
     companion object {
-        private const val PREFS_NAME = "ssher_password_vault"
+        private const val PREFS_NAME = "another_ssh_client_password_vault"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val KEY_ALIAS = "ssher_host_password_aes"
+        private const val KEY_ALIAS = "another_ssh_client_host_password_aes"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
         private const val GCM_TAG_BITS = 128
     }

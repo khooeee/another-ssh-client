@@ -3,7 +3,7 @@ package com.anothersshclient
 import android.app.Application
 import com.anothersshclient.ssh.CryptoInit
 
-class SsherApp : Application() {
+class AnotherSshClientApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         CryptoInit.ensureBouncyCastle()

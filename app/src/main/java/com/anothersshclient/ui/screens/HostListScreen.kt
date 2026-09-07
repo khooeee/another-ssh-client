@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
 import com.anothersshclient.ui.HostListViewModel
+import com.anothersshclient.ui.components.TypewriterBrandTitle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,14 +68,7 @@ fun HostListScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Another SSH Client", style = MaterialTheme.typography.headlineMedium)
-                        Text(
-                            "SSH for Daylight",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    TypewriterBrandTitle()
                 },
                 actions = {
                     if (openSessionCount > 0) {

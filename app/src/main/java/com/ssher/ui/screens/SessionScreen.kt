@@ -7,14 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -102,37 +98,16 @@ fun SessionScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(
+                navigationIcon = {},
+                actions = {
+                    TextButton(
                         onClick = {
                             viewModel.disconnect()
                             onBack()
                         },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    TextButton(
-                        onClick = {
-                            if (sessionPassword != null && !passwordPromptOpen) {
-                                viewModel.disconnect()
-                                sessionPassword = null
-                                passwordPromptOpen = true
-                            } else {
-                                passwordPromptOpen = true
-                            }
-                        },
-                        modifier = Modifier.focusProperties { canFocus = false },
-                    ) {
-                        Text(
-                            when {
-                                state.connecting -> "Cancel"
-                                sessionPassword != null && !passwordPromptOpen -> "Disconnect"
-                                else -> "Connect"
-                            },
-                        )
+                        Text("Disconnect")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

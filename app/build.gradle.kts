@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.ssher"
+    namespace = "com.anothersshclient"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.ssher"
+        applicationId = "com.anothersshclient"
         minSdk = 26
         targetSdk = 34
         versionCode = 2

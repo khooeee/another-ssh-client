@@ -1,11 +1,11 @@
-package com.ssher.terminal
+package com.anothersshclient.terminal
 
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.KeyEvent
 import android.view.MotionEvent
-import com.ssher.data.TerminalPreferences
+import com.anothersshclient.data.TerminalPreferences
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView

@@ -1,7 +1,7 @@
-package com.ssher
+package com.anothersshclient
 
 import android.app.Application
-import com.ssher.ssh.CryptoInit
+import com.anothersshclient.ssh.CryptoInit
 
 class SsherApp : Application() {
     override fun onCreate() {

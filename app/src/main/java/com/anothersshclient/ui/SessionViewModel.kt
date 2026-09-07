@@ -1,10 +1,10 @@
-package com.ssher.ui
+package com.anothersshclient.ui
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import com.ssher.ssh.SshTransport
+import com.anothersshclient.ssh.SshTransport
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 

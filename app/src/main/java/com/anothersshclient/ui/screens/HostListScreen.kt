@@ -1,4 +1,4 @@
-package com.ssher.ui.screens
+package com.anothersshclient.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -45,9 +45,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.ssher.data.HostProfile
-import com.ssher.data.HostRepository
-import com.ssher.ui.HostListViewModel
+import com.anothersshclient.data.HostProfile
+import com.anothersshclient.data.HostRepository
+import com.anothersshclient.ui.HostListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

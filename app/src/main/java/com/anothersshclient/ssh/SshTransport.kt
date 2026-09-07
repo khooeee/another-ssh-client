@@ -1,4 +1,4 @@
-package com.ssher.ssh
+package com.anothersshclient.ssh
 
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalTransport

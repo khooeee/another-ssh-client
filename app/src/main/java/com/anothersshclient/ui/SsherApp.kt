@@ -1,4 +1,4 @@
-package com.ssher.ui
+package com.anothersshclient.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -9,9 +9,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.ssher.data.HostProfile
-import com.ssher.ui.screens.HostListScreen
-import com.ssher.ui.screens.SessionScreen
+import com.anothersshclient.data.HostProfile
+import com.anothersshclient.ui.screens.HostListScreen
+import com.anothersshclient.ui.screens.SessionScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets

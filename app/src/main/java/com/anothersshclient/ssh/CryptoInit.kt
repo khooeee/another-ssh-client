@@ -1,4 +1,4 @@
-package com.ssher.ssh
+package com.anothersshclient.ssh
 
 import java.security.Security
 import org.bouncycastle.jce.provider.BouncyCastleProvider

@@ -1,4 +1,4 @@
-package com.ssher.ui.screens
+package com.anothersshclient.ui.screens
 
 import android.graphics.Typeface
 import android.view.ViewGroup
@@ -42,8 +42,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.ssher.terminal.SsherTerminalClients
-import com.ssher.ui.SessionViewModel
+import com.anothersshclient.terminal.SsherTerminalClients
+import com.anothersshclient.ui.SessionViewModel
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
@@ -168,7 +168,7 @@ fun SessionScreen(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                             )
                             // setTextSize creates mRenderer; setTypeface requires it.
-                            setTextSize(com.ssher.data.TerminalPreferences(ctx).fontSizeSp)
+                            setTextSize(com.anothersshclient.data.TerminalPreferences(ctx).fontSizeSp)
                             setTypeface(Typeface.MONOSPACE)
                             isFocusable = true
                             isFocusableInTouchMode = true

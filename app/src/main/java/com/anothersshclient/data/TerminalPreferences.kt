@@ -1,4 +1,4 @@
-package com.ssher.data
+package com.anothersshclient.data
 
 import android.content.Context
 

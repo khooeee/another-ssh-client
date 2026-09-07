@@ -1,10 +1,10 @@
-package com.ssher.ui
+package com.anothersshclient.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.ssher.data.HostProfile
-import com.ssher.data.HostRepository
+import com.anothersshclient.data.HostProfile
+import com.anothersshclient.data.HostRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn

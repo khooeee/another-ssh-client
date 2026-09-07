@@ -40,8 +40,8 @@ app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Notes
+## License
 
-- Host keys are currently accepted without pinning (tighten later).
-- Passwords use AES-256-GCM + Android Keystore; app backup is disabled.
-- Terminal modules are vendored from termux/termux-app (via a transport-agnostic session adapted like moke).
+SSHer app code is [MIT](LICENSE).
+
+Vendored `terminal-emulator` / `terminal-view` modules are **Apache-2.0** (from [termux/termux-app](https://github.com/termux/termux-app), originally Android Terminal Emulator).

@@ -61,6 +61,7 @@ fun HostListScreen(
     val hosts by viewModel.hosts.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<HostProfile?>(null) }
     var showEditor by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<HostProfile?>(null) }
 
     Scaffold(
         topBar = {
@@ -136,12 +137,44 @@ fun HostListScreen(
                             editing = host
                             showEditor = true
                         },
-                        onDelete = { viewModel.delete(host.id) },
+                        onDelete = { pendingDelete = host },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }
             }
         }
+    }
+
+    pendingDelete?.let { host ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete host?") },
+            text = {
+                Text(
+                    "Remove “${host.name}” (${host.username}@${host.host}:${host.port})? " +
+                        "Saved password will be deleted too. Open sessions are not closed.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.delete(host.id)
+                        pendingDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Cancel") }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+        )
     }
 
     if (showEditor) {

@@ -37,8 +37,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
@@ -57,7 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ssher.ui.SessionViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun SessionScreen(
     hostId: String,
@@ -115,10 +117,13 @@ fun SessionScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.disconnect()
-                        onBack()
-                    }) {
+                    IconButton(
+                        onClick = {
+                            viewModel.disconnect()
+                            onBack()
+                        },
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -131,6 +136,7 @@ fun SessionScreen(
                                 passwordPromptOpen = true
                             }
                         },
+                        modifier = Modifier.focusProperties { canFocus = false },
                     ) {
                         Text(
                             when {
@@ -218,9 +224,20 @@ fun SessionScreen(
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(inputFocus)
+                        // Keep Tab in the terminal — don't let Compose move focus.
+                        .focusProperties {
+                            next = FocusRequester.Cancel
+                            previous = FocusRequester.Cancel
+                        }
                         .onPreviewKeyEvent { event ->
                             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             when {
+                                event.key == Key.Tab -> {
+                                    // Flush typed line + Tab so remote shells can do completion.
+                                    viewModel.send(input + "\t")
+                                    input = ""
+                                    true
+                                }
                                 event.key == Key.Enter -> {
                                     viewModel.send(input + "\n")
                                     input = ""
@@ -247,6 +264,7 @@ fun SessionScreen(
                         input = ""
                     },
                     enabled = state.connected,
+                    modifier = Modifier.focusProperties { canFocus = false },
                 ) {
                     Text("Send")
                 }

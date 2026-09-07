@@ -6,9 +6,11 @@ Password auth via pure Java [sshj](https://github.com/hierynomus/sshj). Sideload
 ## Features (v0.1)
 
 - Saved hosts (name, host, port, user) — passwords are not stored
-- Password authentication
+- Password authentication (optional Keystore-encrypted saved password per host)
 - Interactive shell with line input, Enter / Ctrl+C / Ctrl+D
 - High-contrast greyscale UI
+
+Passwords are AES-256-GCM encrypted with a key in the Android Keystore (hardware-backed when the device supports it). Host metadata stays in plain DataStore; secrets never do. App backup is disabled so credentials aren't copied off-device. This protects against casual file inspection — not a rooted device or malware running as the app.
 
 ## Build
 

@@ -18,11 +18,11 @@ import java.nio.charset.StandardCharsets
 
 private object Routes {
     const val Hosts = "hosts"
-    const val Session = "session/{name}/{host}/{port}/{username}"
+    const val Session = "session/{id}/{name}/{host}/{port}/{username}"
 
     fun session(profile: HostProfile): String {
         val enc = { value: String -> URLEncoder.encode(value, StandardCharsets.UTF_8.name()) }
-        return "session/${enc(profile.name)}/${enc(profile.host)}/${profile.port}/${enc(profile.username)}"
+        return "session/${enc(profile.id)}/${enc(profile.name)}/${enc(profile.host)}/${profile.port}/${enc(profile.username)}"
     }
 }
 
@@ -52,6 +52,7 @@ fun SsherApp() {
         composable(
             route = Routes.Session,
             arguments = listOf(
+                navArgument("id") { type = NavType.StringType },
                 navArgument("name") { type = NavType.StringType },
                 navArgument("host") { type = NavType.StringType },
                 navArgument("port") { type = NavType.IntType },
@@ -62,10 +63,12 @@ fun SsherApp() {
                 URLDecoder.decode(entry.arguments?.getString(key).orEmpty(), StandardCharsets.UTF_8.name())
             }
             SessionScreen(
+                hostId = decode("id"),
                 name = decode("name"),
                 host = decode("host"),
                 port = entry.arguments?.getInt("port") ?: 22,
                 username = decode("username"),
+                loadPassword = { id -> hostListViewModel.passwordFor(id) },
                 onBack = { navController.popBackStack() },
             )
         }

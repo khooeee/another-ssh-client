@@ -60,21 +60,36 @@ import com.ssher.ui.SessionViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionScreen(
+    hostId: String,
     name: String,
     host: String,
     port: Int,
     username: String,
+    loadPassword: suspend (String) -> String?,
     onBack: () -> Unit,
     viewModel: SessionViewModel = viewModel(),
 ) {
     val state = viewModel.uiState
-    var passwordPromptOpen by remember { mutableStateOf(true) }
+    var passwordPromptOpen by remember { mutableStateOf(false) }
+    var resolvingPassword by remember { mutableStateOf(true) }
     var input by remember { mutableStateOf("") }
     val scroll = rememberScrollState()
     val inputFocus = remember { FocusRequester() }
 
     DisposableEffect(Unit) {
         onDispose { viewModel.disconnect() }
+    }
+
+    LaunchedEffect(hostId) {
+        resolvingPassword = true
+        val saved = loadPassword(hostId)
+        if (!saved.isNullOrEmpty()) {
+            passwordPromptOpen = false
+            viewModel.connect(host, port, username, saved)
+        } else {
+            passwordPromptOpen = true
+        }
+        resolvingPassword = false
     }
 
     LaunchedEffect(state.output) {
@@ -147,8 +162,13 @@ fun SessionScreen(
             ) {
                 Text(
                     text = buildString {
-                        append(state.output)
-                        state.error?.let { append("\nError: $it\n") }
+                        when {
+                            resolvingPassword -> append("Loading credentials…\n")
+                            else -> {
+                                append(state.output)
+                                state.error?.let { append("\nError: $it\n") }
+                            }
+                        }
                     }.ifBlank { "Waiting to connect…" },
                     style = TextStyle(
                         fontFamily = FontFamily.Monospace,
@@ -215,7 +235,6 @@ fun SessionScreen(
                                     true
                                 }
                                 event.isCtrlPressed && event.key == Key.L -> {
-                                    // Local clear for readability on paper display.
                                     true
                                 }
                                 else -> false
@@ -235,7 +254,7 @@ fun SessionScreen(
         }
     }
 
-    if (passwordPromptOpen && !state.connected && !state.connecting) {
+    if (passwordPromptOpen && !state.connected && !state.connecting && !resolvingPassword) {
         PasswordDialog(
             username = username,
             host = host,

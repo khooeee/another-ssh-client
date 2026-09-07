@@ -19,9 +19,9 @@ class HostListViewModel(application: Application) : AndroidViewModel(application
         initialValue = emptyList(),
     )
 
-    fun save(profile: HostProfile) {
+    fun save(profile: HostProfile, password: String?) {
         viewModelScope.launch {
-            repository.upsert(profile)
+            repository.upsert(profile, password)
         }
     }
 
@@ -30,4 +30,6 @@ class HostListViewModel(application: Application) : AndroidViewModel(application
             repository.delete(id)
         }
     }
+
+    suspend fun passwordFor(hostId: String): String? = repository.getPassword(hostId)
 }

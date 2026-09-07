@@ -34,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ssher.data.HostProfile
@@ -101,7 +103,7 @@ fun HostListScreen(
                 Text("No hosts yet", style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Add a server, then connect with a password. Built for greyscale Live Paper.",
+                    "Add a server with an optional saved password (encrypted on device).",
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -131,9 +133,10 @@ fun HostListScreen(
     if (showEditor) {
         HostEditorDialog(
             initial = editing,
+            loadPassword = { id -> viewModel.passwordFor(id) },
             onDismiss = { showEditor = false },
-            onSave = { profile ->
-                viewModel.save(profile)
+            onSave = { profile, password ->
+                viewModel.save(profile, password)
                 showEditor = false
             },
         )
@@ -157,7 +160,10 @@ private fun HostRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(host.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "${host.username}@${host.host}:${host.port}",
+                buildString {
+                    append("${host.username}@${host.host}:${host.port}")
+                    if (host.hasPassword) append("  ·  saved password")
+                },
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -173,14 +179,28 @@ private fun HostRow(
 @Composable
 private fun HostEditorDialog(
     initial: HostProfile?,
+    loadPassword: suspend (String) -> String?,
     onDismiss: () -> Unit,
-    onSave: (HostProfile) -> Unit,
+    onSave: (HostProfile, String?) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var host by remember { mutableStateOf(initial?.host.orEmpty()) }
     var port by remember { mutableStateOf((initial?.port ?: 22).toString()) }
     var username by remember { mutableStateOf(initial?.username.orEmpty()) }
-    val canSave = name.isNotBlank() && host.isNotBlank() && username.isNotBlank() &&
+    var password by remember { mutableStateOf("") }
+    var passwordLoaded by remember { mutableStateOf(initial == null) }
+
+    LaunchedEffect(initial?.id) {
+        if (initial != null) {
+            password = loadPassword(initial.id).orEmpty()
+            passwordLoaded = true
+        }
+    }
+
+    val canSave = passwordLoaded &&
+        name.isNotBlank() &&
+        host.isNotBlank() &&
+        username.isNotBlank() &&
         port.toIntOrNull()?.let { it in 1..65535 } == true
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -228,6 +248,19 @@ private fun HostEditorDialog(
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    colors = fieldColors,
+                    supportingText = {
+                        Text("Stored encrypted with Android Keystore. Leave blank to clear.")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
@@ -241,6 +274,7 @@ private fun HostEditorDialog(
                             port = port.toInt(),
                             username = username.trim(),
                         ),
+                        password,
                     )
                 },
                 enabled = canSave,

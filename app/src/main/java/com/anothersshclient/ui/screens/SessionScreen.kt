@@ -4,6 +4,10 @@ import android.graphics.Typeface
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -24,11 +29,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -41,75 +44,79 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anothersshclient.session.PendingOpen
+import com.anothersshclient.session.SessionManager
+import com.anothersshclient.ssh.SshTransport
 import com.anothersshclient.terminal.AppTerminalClients
-import com.anothersshclient.ui.SessionViewModel
+import com.anothersshclient.terminal.NoOpTerminalSessionClient
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import java.util.Properties
-import java.util.concurrent.atomic.AtomicBoolean
 
-/** Shared inset: equal top/bottom of the session header, and top of the terminal. */
 private val SessionChromePaddingHorizontal: Dp = 16.dp
 private val SessionChromePaddingVertical: Dp = 12.dp
 
 @Composable
 fun SessionScreen(
-    hostId: String,
-    name: String,
-    host: String,
-    port: Int,
-    username: String,
+    sessionManager: SessionManager,
     loadPassword: suspend (String) -> String?,
-    onBack: () -> Unit,
-    viewModel: SessionViewModel = viewModel(),
+    onLeaveToHosts: () -> Unit,
 ) {
-    val state = viewModel.uiState
-    var passwordPromptOpen by remember { mutableStateOf(false) }
-    var resolvingPassword by remember { mutableStateOf(true) }
-    var sessionPassword by remember { mutableStateOf<String?>(null) }
-    var connectionId by remember { mutableIntStateOf(0) }
-    val leftSession = remember { AtomicBoolean(false) }
-    val onBackLatest = rememberUpdatedState(onBack)
-    // Navigate home only after the session has finished (same path as Ctrl+D).
-    val leaveToHostList = remember(leftSession, onBackLatest, viewModel) {
-        {
-            if (leftSession.compareAndSet(false, true)) {
-                viewModel.clearSession()
-                onBackLatest.value()
+    val sessions by sessionManager.sessions.collectAsStateWithLifecycle()
+    val activeId by sessionManager.activeId.collectAsStateWithLifecycle()
+    val pendingFlow by sessionManager.pendingOpen.collectAsStateWithLifecycle()
+    val active = sessions.find { it.id == activeId }
+
+    var awaitingPasswordFor by remember { mutableStateOf<PendingOpen?>(null) }
+    var isStarting by remember { mutableStateOf(false) }
+    var hadLiveSession by remember { mutableStateOf(false) }
+
+    val onLeaveLatest = rememberUpdatedState(onLeaveToHosts)
+
+    BackHandler {
+        sessionManager.clearPending()
+        awaitingPasswordFor = null
+        isStarting = false
+        onLeaveLatest.value()
+    }
+
+    LaunchedEffect(sessions.size) {
+        if (sessions.isNotEmpty()) hadLiveSession = true
+    }
+
+    LaunchedEffect(sessions.size, pendingFlow, awaitingPasswordFor, isStarting) {
+        if (hadLiveSession &&
+            sessions.isEmpty() &&
+            pendingFlow == null &&
+            awaitingPasswordFor == null &&
+            !isStarting
+        ) {
+            onLeaveLatest.value()
+        }
+    }
+
+    // Collect pending opens in a stable effect. Keying on pendingFlow cancels mid-flight when
+    // consumePending() clears it, which left isStarting=true and a stuck "Connecting…" screen.
+    LaunchedEffect(Unit) {
+        sessionManager.pendingOpen.collect { pending ->
+            if (pending == null) return@collect
+            sessionManager.consumePending()
+            isStarting = true
+            try {
+                val saved = loadPassword(pending.hostProfileId)
+                if (saved.isNullOrEmpty()) {
+                    awaitingPasswordFor = pending
+                } else {
+                    startSession(sessionManager, pending, saved)
+                }
+            } finally {
+                isStarting = false
             }
         }
-    }
-
-    // Stay in the session; leave via Disconnect or when the remote shell exits (e.g. Ctrl+D).
-    BackHandler(enabled = true) { }
-
-    DisposableEffect(Unit) {
-        onDispose { viewModel.disconnect() }
-    }
-
-    LaunchedEffect(hostId) {
-        resolvingPassword = true
-        leftSession.set(false)
-        viewModel.disconnect()
-        val saved = loadPassword(hostId)
-        if (!saved.isNullOrEmpty()) {
-            sessionPassword = saved
-            passwordPromptOpen = false
-            connectionId++
-        } else {
-            sessionPassword = null
-            passwordPromptOpen = true
-        }
-        resolvingPassword = false
-    }
-
-    fun startWithPassword(value: String) {
-        sessionPassword = value
-        passwordPromptOpen = false
-        connectionId++
     }
 
     Scaffold(
@@ -131,35 +138,81 @@ fun SessionScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(name, style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "$username@$host:$port",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = active?.let { sessionManager.label(it) } ?: "Sessions",
+                            style = MaterialTheme.typography.titleLarge,
                         )
+                        if (active != null) {
+                            Text(
+                                "${active.username}@${active.host}:${active.port}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                     TextButton(
                         onClick = {
-                            // Close the transport; onSessionFinished navigates (same as Ctrl+D).
-                            // If already dead, leave immediately.
-                            val session = viewModel.terminalSession
-                            if (session == null || !session.isRunning) {
-                                leaveToHostList()
-                            } else {
-                                viewModel.disconnect()
-                            }
+                            sessionManager.clearPending()
+                            awaitingPasswordFor = null
+                            isStarting = false
+                            onLeaveToHosts()
+                        },
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
+                        Text("Hosts")
+                    }
+                    TextButton(
+                        onClick = {
+                            val id = activeId
+                            if (id == null) onLeaveToHosts() else sessionManager.disconnect(id)
                         },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
                         Text("Disconnect")
                     }
                 }
+
+                if (sessions.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = SessionChromePaddingHorizontal)
+                            .padding(bottom = SessionChromePaddingVertical),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        sessions.forEach { session ->
+                            val selected = session.id == activeId
+                            Text(
+                                text = sessionManager.label(session),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier
+                                    .border(
+                                        width = if (selected) 2.dp else 1.dp,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                    .background(
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        },
+                                    )
+                                    .clickable { sessionManager.setActive(session.id) }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .focusProperties { canFocus = false },
+                            )
+                        }
+                    }
+                }
+
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             }
         },
     ) { padding ->
-        val password = sessionPassword
-        if (!resolvingPassword && password != null && !passwordPromptOpen) {
-            key(connectionId) {
+        val terminal = active?.terminalSession
+        if (terminal != null) {
+            key(activeId) {
                 AndroidView(
                     factory = { ctx ->
                         val view = TerminalView(ctx, null).apply {
@@ -167,8 +220,9 @@ fun SessionScreen(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                             )
-                            // setTextSize creates mRenderer; setTypeface requires it.
-                            setTextSize(com.anothersshclient.data.TerminalPreferences(ctx).fontSizeSp)
+                            setTextSize(
+                                com.anothersshclient.data.TerminalPreferences(ctx).fontSizeSp,
+                            )
                             setTypeface(Typeface.MONOSPACE)
                             isFocusable = true
                             isFocusableInTouchMode = true
@@ -176,26 +230,18 @@ fun SessionScreen(
                         val baseClients = AppTerminalClients(
                             context = ctx,
                             terminalView = view,
-                            onSessionFinished = { leaveToHostList() },
+                            onFinished = { finished -> sessionManager.onTerminalFinished(finished) },
                         )
-
-                        lateinit var session: TerminalSession
                         val viewClient = object : TerminalViewClient by baseClients {
                             override fun onEmulatorSet() {
-                                applyPaperScheme(session)
+                                applyPaperScheme(terminal)
                                 baseClients.onEmulatorSet()
                                 view.requestFocus()
                             }
                         }
                         view.setTerminalViewClient(viewClient)
-                        session = viewModel.createSession(
-                            host = host,
-                            port = port,
-                            username = username,
-                            password = password,
-                            client = baseClients,
-                        )
-                        view.attachSession(session)
+                        terminal.updateTerminalSessionClient(baseClients)
+                        view.attachSession(terminal)
                         view
                     },
                     modifier = Modifier
@@ -220,9 +266,10 @@ fun SessionScreen(
             ) {
                 Text(
                     when {
-                        resolvingPassword -> "Loading credentials…"
-                        passwordPromptOpen -> "Enter password to connect"
-                        else -> state.error ?: "Waiting…"
+                        awaitingPasswordFor != null -> "Enter password to connect"
+                        isStarting -> "Connecting…"
+                        sessions.isNotEmpty() -> "Select a session"
+                        else -> "Opening…"
                     },
                     style = MaterialTheme.typography.bodyLarge,
                 )
@@ -230,17 +277,49 @@ fun SessionScreen(
         }
     }
 
-    if (passwordPromptOpen && !resolvingPassword) {
+    val passwordTarget = awaitingPasswordFor
+    if (passwordTarget != null) {
         PasswordDialog(
-            username = username,
-            host = host,
+            username = passwordTarget.username,
+            host = passwordTarget.host,
             onDismiss = {
-                passwordPromptOpen = false
-                if (sessionPassword == null) onBack()
+                awaitingPasswordFor = null
+                if (sessions.isEmpty()) onLeaveToHosts()
             },
-            onConnect = { startWithPassword(it) },
+            onConnect = { password ->
+                awaitingPasswordFor = null
+                isStarting = true
+                try {
+                    startSession(sessionManager, passwordTarget, password)
+                } finally {
+                    isStarting = false
+                }
+            },
         )
     }
+}
+
+private fun startSession(
+    sessionManager: SessionManager,
+    pending: PendingOpen,
+    password: String,
+) {
+    val transport = SshTransport(
+        host = pending.host,
+        port = pending.port,
+        username = pending.username,
+        password = password,
+    )
+    val terminal = TerminalSession(
+        transport,
+        /* transcriptRows */ 2000,
+        object : TerminalSessionClient by NoOpTerminalSessionClient {
+            override fun onSessionFinished(finishedSession: TerminalSession) {
+                sessionManager.onTerminalFinished(finishedSession)
+            }
+        },
+    )
+    sessionManager.register(pending, terminal)
 }
 
 private fun applyPaperScheme(session: TerminalSession) {

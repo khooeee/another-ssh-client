@@ -1,36 +1,31 @@
 package com.anothersshclient.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.anothersshclient.data.HostProfile
+import com.anothersshclient.AnotherSshClientApplication
 import com.anothersshclient.ui.screens.HostListScreen
 import com.anothersshclient.ui.screens.SessionScreen
-import java.net.URLDecoder
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 private object Routes {
     const val Hosts = "hosts"
-    const val Session = "session/{id}/{name}/{host}/{port}/{username}"
-
-    fun session(profile: HostProfile): String {
-        val enc = { value: String -> URLEncoder.encode(value, StandardCharsets.UTF_8.name()) }
-        return "session/${enc(profile.id)}/${enc(profile.name)}/${enc(profile.host)}/${profile.port}/${enc(profile.username)}"
-    }
+    const val Sessions = "sessions"
 }
 
 @Composable
 fun AnotherSshClientApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val app = remember(context) { context.applicationContext as android.app.Application }
+    val app = remember(context) { context.applicationContext as AnotherSshClientApplication }
+    val sessionManager = app.sessionManager
+    val openSessions by sessionManager.sessions.collectAsStateWithLifecycle()
+
     val hostListViewModel: HostListViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -40,36 +35,37 @@ fun AnotherSshClientApp() {
         },
     )
 
+    fun goToSessions() {
+        navController.navigate(Routes.Sessions) {
+            launchSingleTop = true
+        }
+    }
+
     NavHost(navController = navController, startDestination = Routes.Hosts) {
         composable(Routes.Hosts) {
             HostListScreen(
                 viewModel = hostListViewModel,
+                openSessionCount = openSessions.size,
+                sessionCountForHost = { id -> sessionManager.sessionCountForHost(id) },
                 onConnect = { profile ->
-                    navController.navigate(Routes.session(profile))
+                    sessionManager.queueOpen(profile)
+                    goToSessions()
                 },
+                onOpenSessions = { goToSessions() },
             )
         }
-        composable(
-            route = Routes.Session,
-            arguments = listOf(
-                navArgument("id") { type = NavType.StringType },
-                navArgument("name") { type = NavType.StringType },
-                navArgument("host") { type = NavType.StringType },
-                navArgument("port") { type = NavType.IntType },
-                navArgument("username") { type = NavType.StringType },
-            ),
-        ) { entry ->
-            val decode = { key: String ->
-                URLDecoder.decode(entry.arguments?.getString(key).orEmpty(), StandardCharsets.UTF_8.name())
-            }
+        composable(Routes.Sessions) {
             SessionScreen(
-                hostId = decode("id"),
-                name = decode("name"),
-                host = decode("host"),
-                port = entry.arguments?.getInt("port") ?: 22,
-                username = decode("username"),
+                sessionManager = sessionManager,
                 loadPassword = { id -> hostListViewModel.passwordFor(id) },
-                onBack = { navController.popBackStack() },
+                onLeaveToHosts = {
+                    if (!navController.popBackStack(Routes.Hosts, inclusive = false)) {
+                        navController.navigate(Routes.Hosts) {
+                            popUpTo(Routes.Sessions) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                },
             )
         }
     }

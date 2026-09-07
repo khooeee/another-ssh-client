@@ -15,7 +15,7 @@ import com.termux.view.TerminalViewClient
 class AppTerminalClients(
     private val context: Context,
     private val terminalView: TerminalView,
-    private val onSessionFinished: () -> Unit,
+    private val onFinished: (TerminalSession) -> Unit,
     private val preferences: TerminalPreferences = TerminalPreferences(context),
 ) : TerminalViewClient, TerminalSessionClient {
 
@@ -69,7 +69,7 @@ class AppTerminalClients(
     override fun onTitleChanged(changedSession: TerminalSession) = Unit
 
     override fun onSessionFinished(finishedSession: TerminalSession) {
-        onSessionFinished()
+        onFinished(finishedSession)
     }
 
     override fun onCopyTextToClipboard(session: TerminalSession, text: String) {

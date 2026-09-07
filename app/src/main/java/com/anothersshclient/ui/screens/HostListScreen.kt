@@ -53,7 +53,10 @@ import com.anothersshclient.ui.HostListViewModel
 @Composable
 fun HostListScreen(
     viewModel: HostListViewModel,
+    openSessionCount: Int = 0,
+    sessionCountForHost: (String) -> Int = { 0 },
     onConnect: (HostProfile) -> Unit,
+    onOpenSessions: () -> Unit = {},
 ) {
     val hosts by viewModel.hosts.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<HostProfile?>(null) }
@@ -70,6 +73,15 @@ fun HostListScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                },
+                actions = {
+                    if (openSessionCount > 0) {
+                        TextButton(onClick = onOpenSessions) {
+                            Text(
+                                if (openSessionCount == 1) "1 session" else "$openSessionCount sessions",
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -115,8 +127,10 @@ fun HostListScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             ) {
                 items(hosts, key = { it.id }) { host ->
+                    val live = sessionCountForHost(host.id)
                     HostRow(
                         host = host,
+                        liveSessionCount = live,
                         onOpen = { onConnect(host) },
                         onEdit = {
                             editing = host
@@ -146,6 +160,7 @@ fun HostListScreen(
 @Composable
 private fun HostRow(
     host: HostProfile,
+    liveSessionCount: Int = 0,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -163,6 +178,10 @@ private fun HostRow(
                 buildString {
                     append("${host.username}@${host.host}:${host.port}")
                     if (host.hasPassword) append("  ·  saved password")
+                    if (liveSessionCount > 0) {
+                        append("  ·  ")
+                        append(if (liveSessionCount == 1) "1 open" else "$liveSessionCount open")
+                    }
                 },
                 style = MaterialTheme.typography.bodySmall,
             )

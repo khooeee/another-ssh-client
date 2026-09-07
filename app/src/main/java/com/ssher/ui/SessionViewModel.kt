@@ -44,13 +44,20 @@ class SessionViewModel : ViewModel() {
     }
 
     fun disconnect() {
-        terminalSession?.finishIfRunning()
+        val session = terminalSession ?: return
+        // Keep the session reference until finish callbacks run; only stop the transport.
+        session.finishIfRunning()
+        uiState = uiState.copy(connected = false, connecting = false)
+    }
+
+    fun clearSession() {
         terminalSession = null
         uiState = uiState.copy(connected = false, connecting = false)
     }
 
     override fun onCleared() {
-        disconnect()
+        terminalSession?.finishIfRunning()
+        terminalSession = null
         super.onCleared()
     }
 }

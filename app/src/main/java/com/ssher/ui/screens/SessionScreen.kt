@@ -2,6 +2,7 @@ package com.ssher.ui.screens
 
 import android.graphics.Typeface
 import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,6 +28,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
@@ -42,6 +44,7 @@ import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import java.util.Properties
+import java.util.concurrent.atomic.AtomicBoolean
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +63,20 @@ fun SessionScreen(
     var resolvingPassword by remember { mutableStateOf(true) }
     var sessionPassword by remember { mutableStateOf<String?>(null) }
     var connectionId by remember { mutableIntStateOf(0) }
+    val leftSession = remember { AtomicBoolean(false) }
+    val onBackLatest = rememberUpdatedState(onBack)
+    // Navigate home only after the session has finished (same path as Ctrl+D).
+    val leaveToHostList = remember(leftSession, onBackLatest, viewModel) {
+        {
+            if (leftSession.compareAndSet(false, true)) {
+                viewModel.clearSession()
+                onBackLatest.value()
+            }
+        }
+    }
+
+    // Stay in the session; leave via Disconnect or when the remote shell exits (e.g. Ctrl+D).
+    BackHandler(enabled = true) { }
 
     DisposableEffect(Unit) {
         onDispose { viewModel.disconnect() }
@@ -67,6 +84,7 @@ fun SessionScreen(
 
     LaunchedEffect(hostId) {
         resolvingPassword = true
+        leftSession.set(false)
         viewModel.disconnect()
         val saved = loadPassword(hostId)
         if (!saved.isNullOrEmpty()) {
@@ -102,8 +120,14 @@ fun SessionScreen(
                 actions = {
                     TextButton(
                         onClick = {
-                            viewModel.disconnect()
-                            onBack()
+                            // Close the transport; onSessionFinished navigates (same as Ctrl+D).
+                            // If already dead, leave immediately.
+                            val session = viewModel.terminalSession
+                            if (session == null || !session.isRunning) {
+                                leaveToHostList()
+                            } else {
+                                viewModel.disconnect()
+                            }
                         },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
@@ -134,7 +158,7 @@ fun SessionScreen(
                         val baseClients = SsherTerminalClients(
                             context = ctx,
                             terminalView = view,
-                            onSessionFinished = { viewModel.markDisconnected() },
+                            onSessionFinished = { leaveToHostList() },
                         )
                         lateinit var session: TerminalSession
                         val viewClient = object : TerminalViewClient by baseClients {

@@ -53,6 +53,7 @@ class SsherTerminalClients(
     override fun onEmulatorSet() = Unit
 
     override fun onTextChanged(changedSession: TerminalSession) {
+        if (!terminalView.isAttachedToWindow) return
         terminalView.onScreenUpdated()
     }
 
@@ -76,6 +77,7 @@ class SsherTerminalClients(
     override fun onBell(session: TerminalSession) = Unit
 
     override fun onColorsChanged(session: TerminalSession) {
+        if (!terminalView.isAttachedToWindow) return
         terminalView.onScreenUpdated()
     }
 

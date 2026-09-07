@@ -1,4 +1,4 @@
-# ssher — SSH client for Daylight DC-1
+# SSHer — SSH client for Daylight DC-1
 
 Native Kotlin / Jetpack Compose SSH client aimed at Daylight's greyscale Live Paper display.
 Password auth via pure Java [sshj](https://github.com/hierynomus/sshj). Terminal rendering via

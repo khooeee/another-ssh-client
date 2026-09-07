@@ -150,7 +150,8 @@ fun SessionScreen(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                             )
-                            setTextSize(15)
+                            // setTextSize creates mRenderer; setTypeface requires it.
+                            setTextSize(com.ssher.data.TerminalPreferences(ctx).fontSizeSp)
                             setTypeface(Typeface.MONOSPACE)
                             isFocusable = true
                             isFocusableInTouchMode = true
@@ -160,6 +161,7 @@ fun SessionScreen(
                             terminalView = view,
                             onSessionFinished = { leaveToHostList() },
                         )
+
                         lateinit var session: TerminalSession
                         val viewClient = object : TerminalViewClient by baseClients {
                             override fun onEmulatorSet() {

@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.view.KeyEvent
 import android.view.MotionEvent
+import com.ssher.data.TerminalPreferences
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
@@ -15,16 +16,24 @@ class SsherTerminalClients(
     private val context: Context,
     private val terminalView: TerminalView,
     private val onSessionFinished: () -> Unit,
+    private val preferences: TerminalPreferences = TerminalPreferences(context),
 ) : TerminalViewClient, TerminalSessionClient {
 
-    private var fontSizeSp: Int = 15
+    private var fontSizeSp: Int = preferences.fontSizeSp
+
+    fun applySavedFontSize() {
+        fontSizeSp = preferences.fontSizeSp
+        terminalView.setTextSize(fontSizeSp)
+    }
 
     override fun onScale(scale: Float): Float {
         // TerminalView accumulates gesture scale into `scale` and expects us to
         // return 1f after applying a font change (Termux behavior).
         if (scale < 0.9f || scale > 1.1f) {
-            fontSizeSp = (fontSizeSp + if (scale > 1f) 1 else -1).coerceIn(8, 48)
+            fontSizeSp = (fontSizeSp + if (scale > 1f) 1 else -1)
+                .coerceIn(TerminalPreferences.MIN_FONT_SIZE, TerminalPreferences.MAX_FONT_SIZE)
             terminalView.setTextSize(fontSizeSp)
+            preferences.fontSizeSp = fontSizeSp
             return 1f
         }
         return scale

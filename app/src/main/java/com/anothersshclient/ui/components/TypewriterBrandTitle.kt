@@ -64,9 +64,9 @@ fun TypewriterBrandTitle() {
         text = buildAnnotatedString {
             append(BrandTitle.take(visibleChars))
             if (showCursor) {
-                // Reserve mono width so the blink does not shift the title.
+                // Thick underscore-style caret (lower eighth block reads heavier than "_").
                 withStyle(SpanStyle(color = if (cursorLit) ink else Color.Transparent)) {
-                    append("▌")
+                    append("▁")
                 }
             }
         },

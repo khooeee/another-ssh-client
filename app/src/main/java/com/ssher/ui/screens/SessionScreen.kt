@@ -12,6 +12,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -106,38 +107,41 @@ fun SessionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(name, style = MaterialTheme.typography.titleLarge)
-                        Text(
-                            "$username@$host:$port",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                },
-                navigationIcon = {},
-                actions = {
-                    TextButton(
-                        onClick = {
-                            // Close the transport; onSessionFinished navigates (same as Ctrl+D).
-                            // If already dead, leave immediately.
-                            val session = viewModel.terminalSession
-                            if (session == null || !session.isRunning) {
-                                leaveToHostList()
-                            } else {
-                                viewModel.disconnect()
-                            }
-                        },
-                        modifier = Modifier.focusProperties { canFocus = false },
-                    ) {
-                        Text("Disconnect")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                ),
-            )
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(name, style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                "$username@$host:$port",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    },
+                    navigationIcon = {},
+                    actions = {
+                        TextButton(
+                            onClick = {
+                                // Close the transport; onSessionFinished navigates (same as Ctrl+D).
+                                // If already dead, leave immediately.
+                                val session = viewModel.terminalSession
+                                if (session == null || !session.isRunning) {
+                                    leaveToHostList()
+                                } else {
+                                    viewModel.disconnect()
+                                }
+                            },
+                            modifier = Modifier.focusProperties { canFocus = false },
+                        ) {
+                            Text("Disconnect")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
+            }
         },
     ) { padding ->
         val password = sessionPassword

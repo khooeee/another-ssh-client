@@ -65,8 +65,10 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Pure Java SSH
+    // Pure Java SSH — full BC replaces Android's truncated "BC" provider (X25519, etc.)
     implementation("com.hierynomus:sshj:0.38.0")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     implementation("org.slf4j:slf4j-android:1.7.36")
 
     debugImplementation("androidx.compose.ui:ui-tooling")

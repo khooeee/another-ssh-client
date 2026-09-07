@@ -119,8 +119,11 @@ fun HostListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
             ) {
+                item {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
+                }
                 items(hosts, key = { it.id }) { host ->
                     val live = sessionCountForHost(host.id)
                     HostRow(

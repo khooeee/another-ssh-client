@@ -158,7 +158,7 @@ fun SessionScreen(
                         },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
-                        Text("Hosts")
+                        Text("New Connection")
                     }
                     TextButton(
                         onClick = {

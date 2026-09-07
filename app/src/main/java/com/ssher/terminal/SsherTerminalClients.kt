@@ -17,14 +17,17 @@ class SsherTerminalClients(
     private val onSessionFinished: () -> Unit,
 ) : TerminalViewClient, TerminalSessionClient {
 
-    private var fontSizePx: Int = 15
+    private var fontSizeSp: Int = 15
 
     override fun onScale(scale: Float): Float {
+        // TerminalView accumulates gesture scale into `scale` and expects us to
+        // return 1f after applying a font change (Termux behavior).
         if (scale < 0.9f || scale > 1.1f) {
-            fontSizePx = (fontSizePx * scale).toInt().coerceIn(10, 40)
-            terminalView.setTextSize(fontSizePx)
+            fontSizeSp = (fontSizeSp + if (scale > 1f) 1 else -1).coerceIn(8, 48)
+            terminalView.setTextSize(fontSizeSp)
+            return 1f
         }
-        return 1f
+        return scale
     }
 
     override fun onSingleTapUp(e: MotionEvent) {

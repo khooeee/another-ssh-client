@@ -39,8 +39,8 @@ private val PaperTypography = Typography(
     headlineMedium = TextStyle(
         fontFamily = JetBrainsMono,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
+        fontSize = 28.sp,
+        lineHeight = 34.sp,
         letterSpacing = (-0.5).sp,
         color = InkBlack,
     ),

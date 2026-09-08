@@ -8,21 +8,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -47,11 +50,14 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anothersshclient.session.PendingOpen
 import com.anothersshclient.session.SessionManager
@@ -190,37 +196,21 @@ fun SessionScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = SessionChromePaddingHorizontal)
-                            .padding(bottom = SessionChromePaddingVertical),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            .padding(horizontal = SessionChromePaddingHorizontal),
+                        verticalAlignment = Alignment.Bottom,
                     ) {
-                        sessions.forEach { session ->
-                            val selected = session.id == activeId
-                            Text(
-                                text = sessionManager.label(session),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                        sessions.forEachIndexed { index, session ->
+                            FilingCabinetTab(
+                                label = sessionManager.label(session),
+                                selected = session.id == activeId,
+                                onClick = { sessionManager.setActive(session.id) },
                                 modifier = Modifier
-                                    .border(
-                                        width = if (selected) 2.dp else 1.dp,
-                                        color = MaterialTheme.colorScheme.outline,
-                                    )
-                                    .background(
-                                        if (selected) {
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        } else {
-                                            MaterialTheme.colorScheme.surface
-                                        },
-                                    )
-                                    .clickable { sessionManager.setActive(session.id) }
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                                    .focusProperties { canFocus = false },
+                                    .widthIn(min = 72.dp)
+                                    .offset(x = if (index > 0) (-1).dp else 0.dp),
                             )
                         }
                     }
                 }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
             }
         },
     ) { padding ->
@@ -322,6 +312,53 @@ fun SessionScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun FilingCabinetTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+    val background = if (selected) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val outline = MaterialTheme.colorScheme.outline
+
+    Box(
+        modifier = modifier
+            .zIndex(if (selected) 1f else 0f)
+            .clickable(onClick = onClick)
+            .focusProperties { canFocus = false },
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .background(background, shape)
+                .border(1.dp, outline, shape)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+        if (selected) {
+            // Cover the tab's own bottom border so it opens into the terminal.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 1.dp)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.surface),
+            )
+        }
     }
 }
 

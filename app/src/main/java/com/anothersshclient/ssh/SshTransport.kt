@@ -23,6 +23,7 @@ class SshTransport(
     private val username: String,
     private val password: String,
     private val terminalTheme: TerminalTheme = TerminalTheme.Light,
+    private val startupDirectory: String? = null,
 ) : TerminalTransport {
 
     private var client: SSHClient? = null
@@ -69,14 +70,13 @@ class SshTransport(
                 session = sess
                 sessionChannel = sess as? SessionChannel
                 out = shell.outputStream
-                // Advertise app terminal theme to remote CLIs (Cursor agent, etc.).
-                // SSH AcceptEnv often blocks TERM_THEME, so inject after the shell starts.
-                // May briefly appear as typed input in the transcript.
+                // Startup commands appear briefly as typed input (same approach as theme hint).
                 runCatching {
-                    val bytes = terminalTheme.shellExportCommand()
-                        .toByteArray(StandardCharsets.UTF_8)
-                    out?.write(bytes)
-                    out?.flush()
+                    val startup = buildStartupCommands(startupDirectory, terminalTheme)
+                    if (startup.isNotEmpty()) {
+                        out?.write(startup.toByteArray(StandardCharsets.UTF_8))
+                        out?.flush()
+                    }
                 }
 
                 val input = shell.inputStream
@@ -132,6 +132,27 @@ class SshTransport(
     private fun feed(session: TerminalSession, message: String) {
         val bytes = message.toByteArray(StandardCharsets.UTF_8)
         session.processToEmulator(bytes, bytes.size)
+    }
+
+    companion object {
+        internal fun buildStartupCommands(
+            startupDirectory: String?,
+            terminalTheme: TerminalTheme,
+        ): String = buildString {
+            val dir = startupDirectory?.trim().orEmpty()
+            if (dir.isNotEmpty()) {
+                append("cd ")
+                append(shellSingleQuote(dir))
+                append('\n')
+            }
+            // Advertise app terminal theme to remote CLIs (Cursor agent, etc.).
+            // SSH AcceptEnv often blocks TERM_THEME, so inject after the shell starts.
+            append(terminalTheme.shellExportCommand())
+        }
+
+        /** POSIX-safe single-quoted string for paths that may contain spaces or quotes. */
+        internal fun shellSingleQuote(value: String): String =
+            "'" + value.replace("'", "'\\''") + "'"
     }
 }
 

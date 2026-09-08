@@ -635,6 +635,7 @@ private fun startSession(
         username = pending.username,
         password = password,
         terminalTheme = terminalTheme,
+        startupDirectory = pending.startupDirectory,
     )
     val terminal = TerminalSession(
         transport,

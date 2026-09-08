@@ -72,7 +72,8 @@ class HostRepository(context: Context) {
                         .put("name", host.name)
                         .put("host", host.host)
                         .put("port", host.port)
-                        .put("username", host.username),
+                        .put("username", host.username)
+                        .put("startupDirectory", host.startupDirectory.orEmpty()),
                 )
             }
             return array.toString()
@@ -92,6 +93,9 @@ class HostRepository(context: Context) {
                                 host = obj.getString("host"),
                                 port = obj.optInt("port", 22),
                                 username = obj.getString("username"),
+                                startupDirectory = obj.optString("startupDirectory", "")
+                                    .trim()
+                                    .ifEmpty { null },
                             ),
                         )
                     }

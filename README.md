@@ -12,6 +12,7 @@ Android SSH client aimed at Daylight DC-1's greyscale Live Paper display.
   - Ctrl+Tab / Ctrl+Shift+Tab to cycle sessions
   - Ctrl+Shift+N to open a new session
   - Ctrl+Shift+R to rename the current session
+- Extra-keys bar for Esc / Tab / Ctrl / Alt / arrows (soft keyboard)
 - Pinch-to-zoom font size
 
 ## Build

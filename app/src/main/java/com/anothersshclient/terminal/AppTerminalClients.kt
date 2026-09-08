@@ -11,11 +11,12 @@ import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 
-/** Minimal Termux clients: keep focus on the terminal, route clipboard, ignore modifier extras. */
+/** Minimal Termux clients: keep focus on the terminal, route clipboard, sticky extra-keys mods. */
 class AppTerminalClients(
     private val context: Context,
     private val terminalView: TerminalView,
     private val onFinished: (TerminalSession) -> Unit,
+    private val extraKeys: ExtraKeysState = ExtraKeysState(),
     private val preferences: TerminalPreferences = TerminalPreferences(context),
 ) : TerminalViewClient, TerminalSessionClient {
 
@@ -53,12 +54,18 @@ class AppTerminalClients(
     override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = false
     override fun onLongPress(event: MotionEvent): Boolean = false
 
-    override fun readControlKey(): Boolean = false
-    override fun readAltKey(): Boolean = false
-    override fun readShiftKey(): Boolean = false
+    override fun readControlKey(): Boolean = extraKeys.ctrl
+    override fun readAltKey(): Boolean = extraKeys.alt
+    override fun readShiftKey(): Boolean = extraKeys.shift
     override fun readFnKey(): Boolean = false
 
-    override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean = false
+    override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
+        // Soft-keyboard input already observed sticky mods via read*Key(); clear one-shot after.
+        if (extraKeys.anyActive) {
+            terminalView.post { extraKeys.consumeOneShot() }
+        }
+        return false
+    }
     override fun onEmulatorSet() = Unit
 
     override fun onTextChanged(changedSession: TerminalSession) {

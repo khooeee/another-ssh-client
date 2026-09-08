@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -81,7 +83,9 @@ import com.anothersshclient.session.PendingOpen
 import com.anothersshclient.session.SessionManager
 import com.anothersshclient.ssh.SshTransport
 import com.anothersshclient.terminal.AppTerminalClients
+import com.anothersshclient.terminal.ExtraKeysState
 import com.anothersshclient.terminal.NoOpTerminalSessionClient
+import com.anothersshclient.ui.components.ExtraKeysBar
 import com.anothersshclient.ui.theme.LocalTerminalTheme
 import com.anothersshclient.ui.theme.TerminalTheme
 import com.termux.terminal.TerminalColors
@@ -114,6 +118,9 @@ fun SessionScreen(
     var isStarting by remember { mutableStateOf(false) }
     var hadLiveSession by remember { mutableStateOf(false) }
     var renamingSession by remember { mutableStateOf<OpenSession?>(null) }
+    val extraKeys = remember { ExtraKeysState() }
+    var terminalViewRef by remember { mutableStateOf<TerminalView?>(null) }
+    val renamingLatest = rememberUpdatedState(renamingSession)
 
     val onLeaveLatest = rememberUpdatedState(onLeaveToHosts)
 
@@ -340,84 +347,107 @@ fun SessionScreen(
     ) { padding ->
         val terminal = active?.terminalSession
         if (terminal != null) {
-            key(activeId) {
-                AndroidView(
-                    factory = { ctx ->
-                        val view = TerminalView(ctx, null).apply {
-                            layoutParams = ViewGroup.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                            )
-                            setTextSize(
-                                com.anothersshclient.data.TerminalPreferences(ctx).fontSizeSp,
-                            )
-                            setTypeface(Typeface.MONOSPACE)
-                            isFocusable = true
-                            isFocusableInTouchMode = true
-                            // Keyboard focus (e.g. Enter from host list) otherwise draws Android's
-                            // default focus highlight as a dark wash over the paper terminal.
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                defaultFocusHighlightEnabled = false
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
+            ) {
+                key(activeId) {
+                    AndroidView(
+                        factory = { ctx ->
+                            val view = TerminalView(ctx, null).apply {
+                                layoutParams = ViewGroup.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                )
+                                setTextSize(
+                                    com.anothersshclient.data.TerminalPreferences(ctx).fontSizeSp,
+                                )
+                                setTypeface(Typeface.MONOSPACE)
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+                                // Keyboard focus (e.g. Enter from host list) otherwise draws Android's
+                                // default focus highlight as a dark wash over the paper terminal.
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    defaultFocusHighlightEnabled = false
+                                }
                             }
-                        }
-                        val baseClients = AppTerminalClients(
-                            context = ctx,
-                            terminalView = view,
-                            onFinished = { finished -> sessionManager.onTerminalFinished(finished) },
-                        )
-                        val viewClient = object : TerminalViewClient by baseClients {
-                            override fun onEmulatorSet() {
-                                applyTerminalScheme(terminal, terminalThemeLatest.value)
-                                baseClients.onEmulatorSet()
-                                view.requestFocus()
-                            }
+                            val baseClients = AppTerminalClients(
+                                context = ctx,
+                                terminalView = view,
+                                onFinished = { finished -> sessionManager.onTerminalFinished(finished) },
+                                extraKeys = extraKeys,
+                            )
+                            val viewClient = object : TerminalViewClient by baseClients {
+                                override fun onEmulatorSet() {
+                                    applyTerminalScheme(terminal, terminalThemeLatest.value)
+                                    baseClients.onEmulatorSet()
+                                    if (renamingLatest.value == null) {
+                                        view.requestFocus()
+                                    }
+                                }
 
-                            override fun onKeyDown(
-                                keyCode: Int,
-                                e: KeyEvent,
-                                session: TerminalSession,
-                            ): Boolean {
-                                if (!e.isCtrlPressed) {
+                                override fun onKeyDown(
+                                    keyCode: Int,
+                                    e: KeyEvent,
+                                    session: TerminalSession,
+                                ): Boolean {
+                                    val ctrl = e.isCtrlPressed || baseClients.readControlKey()
+                                    val shift = e.isShiftPressed || baseClients.readShiftKey()
+                                    if (!ctrl) {
+                                        return baseClients.onKeyDown(keyCode, e, session)
+                                    }
+                                    when (keyCode) {
+                                        KeyEvent.KEYCODE_TAB -> {
+                                            sessionManager.selectAdjacent(forward = !shift)
+                                            extraKeys.consumeOneShot()
+                                            return true
+                                        }
+                                        KeyEvent.KEYCODE_N -> {
+                                            if (shift) {
+                                                leaveToNewSession()
+                                                extraKeys.consumeOneShot()
+                                                return true
+                                            }
+                                        }
+                                        KeyEvent.KEYCODE_R -> {
+                                            if (shift) {
+                                                sessionManager.activeSession()?.let { renamingSession = it }
+                                                extraKeys.consumeOneShot()
+                                                return true
+                                            }
+                                        }
+                                    }
                                     return baseClients.onKeyDown(keyCode, e, session)
                                 }
-                                when (keyCode) {
-                                    KeyEvent.KEYCODE_TAB -> {
-                                        sessionManager.selectAdjacent(forward = !e.isShiftPressed)
-                                        return true
-                                    }
-                                    KeyEvent.KEYCODE_N -> {
-                                        if (e.isShiftPressed) {
-                                            leaveToNewSession()
-                                            return true
-                                        }
-                                    }
-                                    KeyEvent.KEYCODE_R -> {
-                                        if (e.isShiftPressed) {
-                                            active?.let { renamingSession = it }
-                                            return true
-                                        }
-                                    }
-                                }
-                                return baseClients.onKeyDown(keyCode, e, session)
                             }
-                        }
-                        view.setTerminalViewClient(viewClient)
-                        terminal.updateTerminalSessionClient(baseClients)
-                        view.attachSession(terminal)
-                        view
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .imePadding()
-                        .padding(
-                            start = SessionChromePaddingHorizontal,
-                            end = SessionChromePaddingHorizontal,
-                            top = SessionChromePaddingVertical,
-                        ),
-                    update = { view ->
-                        if (!view.hasFocus()) view.requestFocus()
-                    },
+                            view.setTerminalViewClient(viewClient)
+                            terminal.updateTerminalSessionClient(baseClients)
+                            view.attachSession(terminal)
+                            terminalViewRef = view
+                            view
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .padding(
+                                start = SessionChromePaddingHorizontal,
+                                end = SessionChromePaddingHorizontal,
+                                top = SessionChromePaddingVertical,
+                            ),
+                        update = { view ->
+                            terminalViewRef = view
+                            // Don't steal focus from rename dialog / other chrome.
+                            if (renamingLatest.value == null && !view.hasFocus()) {
+                                view.requestFocus()
+                            }
+                        },
+                    )
+                }
+                ExtraKeysBar(
+                    state = extraKeys,
+                    terminalView = terminalViewRef,
                 )
             }
         } else {
@@ -425,7 +455,7 @@ fun SessionScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .imePadding()
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
                     .padding(24.dp),
             ) {
                 Text(

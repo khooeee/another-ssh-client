@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -63,6 +64,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -564,6 +566,30 @@ private fun HostEditorDialog(
         username.isNotBlank() &&
         port.toIntOrNull()?.let { it in 1..65535 } == true
 
+    fun saveIfAllowed() {
+        if (!canSave) return
+        onSave(
+            HostProfile(
+                id = initial?.id ?: HostRepository.newId(),
+                name = trimmedName,
+                host = host.trim(),
+                port = port.toInt(),
+                username = username.trim(),
+                startupCommand = startupCommand.trim().ifEmpty { null },
+            ),
+            password,
+        )
+    }
+
+    val saveOnEnterModifier = Modifier.onPreviewKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        if (event.key != Key.Enter && event.key != Key.NumPadEnter) {
+            return@onPreviewKeyEvent false
+        }
+        saveIfAllowed()
+        true
+    }
+
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = MaterialTheme.colorScheme.outline,
         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
@@ -591,33 +617,43 @@ private fun HostEditorDialog(
                     } else {
                         null
                     },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = host,
                     onValueChange = { host = it },
                     label = { Text("Hostname / IP") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = port,
                     onValueChange = { port = it.filter(Char::isDigit).take(5) },
                     label = { Text("Port") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("Username") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = password,
@@ -625,41 +661,35 @@ private fun HostEditorDialog(
                     label = { Text("Password") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done,
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
                     supportingText = {
                         Text("Stored encrypted with Android Keystore. Leave blank to clear.")
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = startupCommand,
                     onValueChange = { startupCommand = it },
                     label = { Text("Start command") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
                     supportingText = {
-                        Text("Optional. Runs after connect (e.g. cd ~/code && tmux a).")
+                        Text("Optional. Runs after connect (e.g. cd ~/code && tmux attach -t session || tmux new -s session).")
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
                 )
             }
         },
         confirmButton = {
             Button(
-                onClick = {
-                    onSave(
-                        HostProfile(
-                            id = initial?.id ?: HostRepository.newId(),
-                            name = trimmedName,
-                            host = host.trim(),
-                            port = port.toInt(),
-                            username = username.trim(),
-                            startupCommand = startupCommand.trim().ifEmpty { null },
-                        ),
-                        password,
-                    )
-                },
+                onClick = { saveIfAllowed() },
                 enabled = canSave,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

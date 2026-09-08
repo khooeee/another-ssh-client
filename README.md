@@ -1,6 +1,6 @@
 # Another SSH Client
 
-Native Kotlin / Jetpack Compose SSH client aimed at Daylight DC-1's greyscale Live Paper display.
+Android SSH client aimed at Daylight DC-1's greyscale Live Paper display.
 
 ## Features
 

@@ -96,6 +96,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 private val SessionChromePaddingHorizontal: Dp = 16.dp
 private val SessionChromePaddingVertical: Dp = 12.dp
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SessionScreen(
     sessionManager: SessionManager,
@@ -210,6 +211,16 @@ fun SessionScreen(
                         Text(
                             text = active?.let { sessionManager.label(it) } ?: "Sessions",
                             style = MaterialTheme.typography.titleLarge,
+                            modifier = if (active != null) {
+                                Modifier.combinedClickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {},
+                                    onDoubleClick = { renamingSession = active },
+                                )
+                            } else {
+                                Modifier
+                            },
                         )
                         if (active != null) {
                             Text(

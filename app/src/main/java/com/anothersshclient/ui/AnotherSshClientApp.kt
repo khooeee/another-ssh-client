@@ -46,7 +46,6 @@ fun AnotherSshClientApp() {
             HostListScreen(
                 viewModel = hostListViewModel,
                 openSessionCount = openSessions.size,
-                sessionCountForHost = { id -> sessionManager.sessionCountForHost(id) },
                 onConnect = { profile ->
                     sessionManager.queueOpen(profile)
                     goToSessions()

@@ -55,7 +55,6 @@ import com.anothersshclient.ui.components.TypewriterBrandTitle
 fun HostListScreen(
     viewModel: HostListViewModel,
     openSessionCount: Int = 0,
-    sessionCountForHost: (String) -> Int = { 0 },
     onConnect: (HostProfile) -> Unit,
     onOpenSessions: () -> Unit = {},
 ) {
@@ -123,10 +122,8 @@ fun HostListScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 }
                 items(hosts, key = { it.id }) { host ->
-                    val live = sessionCountForHost(host.id)
                     HostRow(
                         host = host,
-                        liveSessionCount = live,
                         onOpen = { onConnect(host) },
                         onEdit = {
                             editing = host
@@ -188,7 +185,6 @@ fun HostListScreen(
 @Composable
 private fun HostRow(
     host: HostProfile,
-    liveSessionCount: Int = 0,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -203,13 +199,7 @@ private fun HostRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(host.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                buildString {
-                    append("${host.username}@${host.host}:${host.port}")
-                    if (liveSessionCount > 0) {
-                        append("  ·  ")
-                        append(if (liveSessionCount == 1) "1 open" else "$liveSessionCount open")
-                    }
-                },
+                "${host.username}@${host.host}:${host.port}",
                 style = MaterialTheme.typography.bodySmall,
             )
         }

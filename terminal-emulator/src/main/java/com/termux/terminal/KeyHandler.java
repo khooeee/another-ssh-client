@@ -248,7 +248,20 @@ public final class KeyHandler {
                 // This is back-tab when shifted:
                 return (keyMode & KEYMOD_SHIFT) == 0 ? "\011" : "\033[Z";
             case KEYCODE_ENTER:
-                return ((keyMode & KEYMOD_ALT) == 0) ? "\r" : "\033\r";
+                // Plain Enter is CR. Bare Alt+Enter stays ESC+CR (common legacy binding).
+                // Shift/Ctrl(+combos) use xterm modifyOtherKeys: CSI 27 ; modifier ; 13 ~
+                // so remote apps (e.g. Claude Code, Codex) can tell Shift+Enter from Enter.
+                if (keyMode == 0) {
+                    return "\r";
+                }
+                if (keyMode == KEYMOD_ALT) {
+                    return "\033\r";
+                }
+                int enterModifier = xtermModifier(keyMode);
+                if (enterModifier < 0) {
+                    return "\r";
+                }
+                return "\033[27;" + enterModifier + ";13~";
 
             case KEYCODE_NUMPAD_ENTER:
                 return keypadApplication ? transformForModifiers("\033O", keyMode, 'M') : "\n";
@@ -342,32 +355,32 @@ public final class KeyHandler {
     }
 
     private static String transformForModifiers(String start, int keymod, char lastChar) {
-        int modifier;
-        switch (keymod) {
-            case KEYMOD_SHIFT:
-                modifier = 2;
-                break;
-            case KEYMOD_ALT:
-                modifier = 3;
-                break;
-            case (KEYMOD_SHIFT | KEYMOD_ALT):
-                modifier = 4;
-                break;
-            case KEYMOD_CTRL:
-                modifier = 5;
-                break;
-            case KEYMOD_SHIFT | KEYMOD_CTRL:
-                modifier = 6;
-                break;
-            case KEYMOD_ALT | KEYMOD_CTRL:
-                modifier = 7;
-                break;
-            case KEYMOD_SHIFT | KEYMOD_ALT | KEYMOD_CTRL:
-                modifier = 8;
-                break;
-            default:
-                return start + lastChar;
+        int modifier = xtermModifier(keymod);
+        if (modifier < 0) {
+            return start + lastChar;
         }
         return start + (";" + modifier) + lastChar;
+    }
+
+    /** xterm modifier parameter (bits+1), or -1 if none / unknown. */
+    private static int xtermModifier(int keymod) {
+        switch (keymod) {
+            case KEYMOD_SHIFT:
+                return 2;
+            case KEYMOD_ALT:
+                return 3;
+            case KEYMOD_SHIFT | KEYMOD_ALT:
+                return 4;
+            case KEYMOD_CTRL:
+                return 5;
+            case KEYMOD_SHIFT | KEYMOD_CTRL:
+                return 6;
+            case KEYMOD_ALT | KEYMOD_CTRL:
+                return 7;
+            case KEYMOD_SHIFT | KEYMOD_ALT | KEYMOD_CTRL:
+                return 8;
+            default:
+                return -1;
+        }
     }
 }

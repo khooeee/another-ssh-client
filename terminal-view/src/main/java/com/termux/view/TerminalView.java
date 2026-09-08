@@ -397,6 +397,18 @@ public final class TerminalView extends View {
                     if (mClient.readShiftKey())
                         codePoint = Character.toUpperCase(codePoint);
 
+                    // Soft keyboards often commit \n for Enter (not a KeyEvent). With sticky Shift,
+                    // send xterm Shift+Enter so it matches the hardware-key path in KeyHandler.
+                    if (codePoint == '\n' && mClient.readShiftKey()) {
+                        String shiftEnter = KeyHandler.getCode(
+                            KeyEvent.KEYCODE_ENTER, KeyHandler.KEYMOD_SHIFT, false, false);
+                        if (shiftEnter != null) {
+                            mTermSession.write(shiftEnter);
+                            mClient.onCodePoint('\n', false, mTermSession);
+                            continue;
+                        }
+                    }
+
                     boolean ctrlHeld = false;
                     if (codePoint <= 31 && codePoint != 27) {
                         if (codePoint == '\n') {

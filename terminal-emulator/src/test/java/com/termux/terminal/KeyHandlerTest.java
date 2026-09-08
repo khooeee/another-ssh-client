@@ -107,6 +107,10 @@ public class KeyHandlerTest extends TestCase {
 		// Return sends carriage return (\r), which normally gets translated by the device driver to newline (\n) unless the ICRNL termios
 		// flag has been set.
 		assertKeysEquals("\r", KeyHandler.getCode(KeyEvent.KEYCODE_ENTER, 0, false, false));
+		assertKeysEquals("\033\r", KeyHandler.getCode(KeyEvent.KEYCODE_ENTER, KeyHandler.KEYMOD_ALT, false, false));
+		assertKeysEquals("\033[27;2;13~", KeyHandler.getCode(KeyEvent.KEYCODE_ENTER, KeyHandler.KEYMOD_SHIFT, false, false));
+		assertKeysEquals("\033[27;5;13~", KeyHandler.getCode(KeyEvent.KEYCODE_ENTER, KeyHandler.KEYMOD_CTRL, false, false));
+		assertKeysEquals("\033[27;6;13~", KeyHandler.getCode(KeyEvent.KEYCODE_ENTER, KeyHandler.KEYMOD_SHIFT | KeyHandler.KEYMOD_CTRL, false, false));
 
 		// Backspace.
 		assertKeysEquals("\u007f", KeyHandler.getCode(KeyEvent.KEYCODE_DEL, 0, false, false));

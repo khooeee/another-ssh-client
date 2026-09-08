@@ -67,6 +67,31 @@ class SessionManager {
         return if (peers > 1) "${session.title} · ${session.ordinal}" else session.title
     }
 
+    fun rename(id: String, newTitle: String) {
+        val trimmed = newTitle.trim()
+        if (trimmed.isEmpty()) return
+        val current = _sessions.value.find { it.id == id } ?: return
+        if (current.title.equals(trimmed, ignoreCase = true)) {
+            if (current.title != trimmed) {
+                _sessions.update { list ->
+                    list.map { session ->
+                        if (session.id == id) session.copy(title = trimmed) else session
+                    }
+                }
+            }
+            return
+        }
+        val taken = _sessions.value.any { session ->
+            session.id != id && session.title.equals(trimmed, ignoreCase = true)
+        }
+        if (taken) return
+        _sessions.update { list ->
+            list.map { session ->
+                if (session.id == id) session.copy(title = trimmed) else session
+            }
+        }
+    }
+
     fun activeSession(): OpenSession? =
         _sessions.value.find { it.id == _activeId.value }
 

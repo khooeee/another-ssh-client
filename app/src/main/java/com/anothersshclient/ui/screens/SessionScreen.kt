@@ -6,8 +6,9 @@ import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -43,6 +46,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -57,7 +62,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -68,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anothersshclient.session.OpenSession
 import com.anothersshclient.session.PendingOpen
 import com.anothersshclient.session.SessionManager
 import com.anothersshclient.ssh.SshTransport
@@ -97,6 +102,7 @@ fun SessionScreen(
     var awaitingPasswordFor by remember { mutableStateOf<PendingOpen?>(null) }
     var isStarting by remember { mutableStateOf(false) }
     var hadLiveSession by remember { mutableStateOf(false) }
+    var renamingSession by remember { mutableStateOf<OpenSession?>(null) }
 
     val onLeaveLatest = rememberUpdatedState(onLeaveToHosts)
 
@@ -234,6 +240,7 @@ fun SessionScreen(
                                     // Share side walls: only the first tab draws a leading edge.
                                     drawLeadingEdge = index == 0,
                                     onClick = { sessionManager.setActive(session.id) },
+                                    onRename = { renamingSession = session },
                                     modifier = Modifier
                                         .onGloballyPositioned { tabCoords ->
                                             if (!selected) return@onGloballyPositioned
@@ -401,14 +408,30 @@ fun SessionScreen(
             },
         )
     }
+
+    renamingSession?.let { session ->
+        RenameSessionDialog(
+            initialName = session.title,
+            otherTitles = sessions
+                .filter { it.id != session.id }
+                .map { it.title },
+            onDismiss = { renamingSession = null },
+            onRename = { newName ->
+                sessionManager.rename(session.id, newName)
+                renamingSession = null
+            },
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FilingCabinetTab(
     label: String,
     selected: Boolean,
     drawLeadingEdge: Boolean,
     onClick: () -> Unit,
+    onRename: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val stroke = 1.dp
@@ -418,14 +441,16 @@ private fun FilingCabinetTab(
         MaterialTheme.colorScheme.surfaceVariant
     }
     val outline = MaterialTheme.colorScheme.outline
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
             .zIndex(if (selected) 2f else 1f)
-            .clickable(
+            .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
+                onLongClick = { menuExpanded = true },
             )
             .focusProperties { canFocus = false },
     ) {
@@ -466,7 +491,88 @@ private fun FilingCabinetTab(
                 }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         )
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                onClick = {
+                    menuExpanded = false
+                    onRename()
+                },
+            )
+        }
     }
+}
+
+@Composable
+private fun RenameSessionDialog(
+    initialName: String,
+    otherTitles: List<String>,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit,
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    val focusRequester = remember { FocusRequester() }
+    val trimmed = name.trim()
+    val nameTaken = trimmed.isNotEmpty() &&
+        !trimmed.equals(initialName, ignoreCase = true) &&
+        otherTitles.any { it.equals(trimmed, ignoreCase = true) }
+    val colors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = MaterialTheme.colorScheme.outline,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+        cursorColor = MaterialTheme.colorScheme.onSurface,
+        focusedLabelColor = MaterialTheme.colorScheme.onSurface,
+        errorBorderColor = MaterialTheme.colorScheme.outline,
+        errorLabelColor = MaterialTheme.colorScheme.onSurface,
+        errorCursorColor = MaterialTheme.colorScheme.onSurface,
+        errorSupportingTextColor = MaterialTheme.colorScheme.onSurface,
+    )
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename session") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
+                singleLine = true,
+                isError = nameTaken,
+                supportingText = if (nameTaken) {
+                    { Text("That name already exists. Choose another one.") }
+                } else {
+                    null
+                },
+                colors = colors,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onRename(name) },
+                enabled = trimmed.isNotEmpty() && !nameTaken,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Text("Rename")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+    )
 }
 
 private fun startSession(

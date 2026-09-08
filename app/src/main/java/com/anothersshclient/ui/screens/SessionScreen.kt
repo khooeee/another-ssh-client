@@ -230,9 +230,8 @@ fun SessionScreen(
                                 FilingCabinetTab(
                                     label = sessionManager.label(session),
                                     selected = selected,
-                                    // Share side walls: only the first tab (or the selected tab)
-                                    // draws a leading edge — avoids 1px + 1px = 2px joins.
-                                    drawLeadingEdge = index == 0 || selected,
+                                    // Share side walls: only the first tab draws a leading edge.
+                                    drawLeadingEdge = index == 0,
                                     onClick = { sessionManager.setActive(session.id) },
                                     modifier = Modifier
                                         .onGloballyPositioned { tabCoords ->

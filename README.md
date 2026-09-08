@@ -6,7 +6,8 @@ Native Kotlin / Jetpack Compose SSH client aimed at Daylight DC-1's greyscale Li
 
 - Multiple concurrent sessions
 - Customize start directory per host
-- Hosts & tabs can be reordered by dragging
+- Hosts & sessions can be reordered by dragging
+- Double press the session tab to rename it
 - Keyboard driven
   - Ctrl+Tab / Ctrl+Shift+Tab to cycle sessions
   - Ctrl+Shift+N to open a new session

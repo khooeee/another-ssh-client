@@ -7,17 +7,21 @@ import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class HostListViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = HostRepository(application)
 
-    val hosts: StateFlow<List<HostProfile>> = repository.hosts.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = emptyList(),
-    )
+    /** Null until DataStore emits; empty list means no saved hosts. */
+    val hosts: StateFlow<List<HostProfile>?> = repository.hosts
+        .map<List<HostProfile>, List<HostProfile>?> { it }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null,
+        )
 
     fun save(profile: HostProfile, password: String?) {
         viewModelScope.launch {

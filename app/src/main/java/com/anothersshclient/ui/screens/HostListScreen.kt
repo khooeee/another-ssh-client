@@ -73,17 +73,36 @@ fun HostListScreen(
     onConnect: (HostProfile) -> Unit,
     onOpenSessions: () -> Unit = {},
 ) {
-    val hosts by viewModel.hosts.collectAsStateWithLifecycle()
+    val hostsState by viewModel.hosts.collectAsStateWithLifecycle()
+    val hosts = hostsState.orEmpty()
     var editing by remember { mutableStateOf<HostProfile?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<HostProfile?>(null) }
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val firstHostFocusRequester = remember { FocusRequester() }
     val lastHostFocusRequester = remember { FocusRequester() }
+    val fabFocusRequester = remember { FocusRequester() }
     val fabInteraction = remember { MutableInteractionSource() }
     val fabFocused by fabInteraction.collectIsFocusedAsState()
     val fabShape = FloatingActionButtonDefaults.shape
+    var didInitialFocus by remember { mutableStateOf(false) }
+
+    LaunchedEffect(hostsState) {
+        if (didInitialFocus) return@LaunchedEffect
+        val loaded = hostsState ?: return@LaunchedEffect
+        if (showEditor || pendingDelete != null) return@LaunchedEffect
+        withFrameNanos { }
+        if (loaded.isEmpty()) {
+            fabFocusRequester.requestFocus()
+        } else {
+            listState.scrollToItem(1)
+            withFrameNanos { }
+            firstHostFocusRequester.requestFocus()
+        }
+        didInitialFocus = true
+    }
 
     Scaffold(
         topBar = {
@@ -129,6 +148,7 @@ fun HostListScreen(
                     hoveredElevation = 0.dp,
                 ),
                 modifier = Modifier
+                    .focusRequester(fabFocusRequester)
                     .border(
                         width = if (fabFocused) 3.dp else 1.dp,
                         color = MaterialTheme.colorScheme.outline,
@@ -144,7 +164,11 @@ fun HostListScreen(
                             // LazyColumn index 0 is the top divider; hosts start at 1.
                             listState.scrollToItem(hosts.size)
                             withFrameNanos { }
-                            lastHostFocusRequester.requestFocus()
+                            if (hosts.size == 1) {
+                                firstHostFocusRequester.requestFocus()
+                            } else {
+                                lastHostFocusRequester.requestFocus()
+                            }
                         }
                         true
                     },
@@ -181,13 +205,15 @@ fun HostListScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 }
                 itemsIndexed(hosts, key = { _, host -> host.id }) { index, host ->
+                    val rowFocusRequester = when {
+                        hosts.size == 1 -> firstHostFocusRequester
+                        index == 0 -> firstHostFocusRequester
+                        index == hosts.lastIndex -> lastHostFocusRequester
+                        else -> null
+                    }
                     HostRow(
                         host = host,
-                        rowFocusRequester = if (index == hosts.lastIndex) {
-                            lastHostFocusRequester
-                        } else {
-                            null
-                        },
+                        rowFocusRequester = rowFocusRequester,
                         onOpen = { onConnect(host) },
                         onEdit = {
                             editing = host

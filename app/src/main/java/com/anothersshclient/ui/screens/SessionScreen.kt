@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -232,9 +231,11 @@ fun SessionScreen(
                                 FilingCabinetTab(
                                     label = sessionManager.label(session),
                                     selected = selected,
+                                    // Share side walls: only the first tab (or the selected tab)
+                                    // draws a leading edge — avoids 1px + 1px = 2px joins.
+                                    drawLeadingEdge = index == 0 || selected,
                                     onClick = { sessionManager.setActive(session.id) },
                                     modifier = Modifier
-                                        .offset(x = if (index > 0) (-1).dp else 0.dp)
                                         .onGloballyPositioned { tabCoords ->
                                             if (!selected) return@onGloballyPositioned
                                             val strip = stripCoords ?: return@onGloballyPositioned
@@ -402,6 +403,7 @@ fun SessionScreen(
 private fun FilingCabinetTab(
     label: String,
     selected: Boolean,
+    drawLeadingEdge: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -431,7 +433,10 @@ private fun FilingCabinetTab(
                 .padding(bottom = stroke)
                 .background(
                     color = background,
-                    shape = RoundedCornerShape(topStart = corner, topEnd = corner),
+                    shape = RoundedCornerShape(
+                        topStart = if (drawLeadingEdge) corner else 0.dp,
+                        topEnd = corner,
+                    ),
                 ),
         )
         Text(
@@ -446,14 +451,18 @@ private fun FilingCabinetTab(
                     val strokePx = stroke.toPx()
                     val inset = strokePx / 2f
                     val radius = corner.toPx()
-                    val path = Path().apply {
-                        moveTo(inset, size.height)
-                        lineTo(inset, radius)
-                        quadraticTo(inset, inset, radius, inset)
-                        lineTo(size.width - radius, inset)
-                        quadraticTo(size.width - inset, inset, size.width - inset, radius)
-                        lineTo(size.width - inset, size.height)
+                    val path = Path()
+                    if (drawLeadingEdge) {
+                        path.moveTo(inset, size.height)
+                        path.lineTo(inset, radius)
+                        path.quadraticTo(inset, inset, radius, inset)
+                    } else {
+                        // Previous tab owns the shared wall; start along the top edge.
+                        path.moveTo(0f, inset)
                     }
+                    path.lineTo(size.width - radius, inset)
+                    path.quadraticTo(size.width - inset, inset, size.width - inset, radius)
+                    path.lineTo(size.width - inset, size.height)
                     drawPath(
                         path = path,
                         color = outline,

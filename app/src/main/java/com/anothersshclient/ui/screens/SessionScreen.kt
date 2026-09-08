@@ -4,6 +4,7 @@ import android.graphics.Typeface
 import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -26,7 +27,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -45,6 +45,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
@@ -54,6 +56,10 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -196,33 +202,74 @@ fun SessionScreen(
                 }
 
                 if (sessions.isNotEmpty()) {
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        // Manila folder edge — full width, including side chrome padding.
-                        HorizontalDivider(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .fillMaxWidth()
-                                .zIndex(0f),
-                            color = MaterialTheme.colorScheme.outline,
-                            thickness = 1.dp,
-                        )
+                    val outline = MaterialTheme.colorScheme.outline
+                    val edgeStroke = with(LocalDensity.current) { 1.dp.toPx() }
+                    var stripCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+                    var selectedTabGap by remember(activeId) { mutableStateOf<Rect?>(null) }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { stripCoords = it },
+                    ) {
                         Row(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .zIndex(1f)
                                 .horizontalScroll(rememberScrollState())
                                 .padding(horizontal = SessionChromePaddingHorizontal),
                             verticalAlignment = Alignment.Bottom,
                         ) {
                             sessions.forEachIndexed { index, session ->
+                                val selected = session.id == activeId
                                 FilingCabinetTab(
                                     label = sessionManager.label(session),
-                                    selected = session.id == activeId,
+                                    selected = selected,
                                     onClick = { sessionManager.setActive(session.id) },
                                     modifier = Modifier
                                         .widthIn(min = 72.dp)
-                                        .offset(x = if (index > 0) (-1).dp else 0.dp),
+                                        .offset(x = if (index > 0) (-1).dp else 0.dp)
+                                        .onGloballyPositioned { tabCoords ->
+                                            if (!selected) return@onGloballyPositioned
+                                            val strip = stripCoords ?: return@onGloballyPositioned
+                                            if (strip.isAttached && tabCoords.isAttached) {
+                                                selectedTabGap = strip.localBoundingBoxOf(tabCoords)
+                                            }
+                                        },
                                 )
+                            }
+                        }
+                        Canvas(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .height(1.dp),
+                        ) {
+                            val y = size.height / 2f
+                            val gap = selectedTabGap
+                            if (gap == null) {
+                                drawLine(
+                                    color = outline,
+                                    start = Offset(0f, y),
+                                    end = Offset(size.width, y),
+                                    strokeWidth = edgeStroke,
+                                )
+                            } else {
+                                if (gap.left > 0f) {
+                                    drawLine(
+                                        color = outline,
+                                        start = Offset(0f, y),
+                                        end = Offset(gap.left, y),
+                                        strokeWidth = edgeStroke,
+                                    )
+                                }
+                                if (gap.right < size.width) {
+                                    drawLine(
+                                        color = outline,
+                                        start = Offset(gap.right, y),
+                                        end = Offset(size.width, y),
+                                        strokeWidth = edgeStroke,
+                                    )
+                                }
                             }
                         }
                     }
@@ -357,6 +404,16 @@ private fun FilingCabinetTab(
             )
             .focusProperties { canFocus = false },
     ) {
+        // Keep fill above the baseline so inactive tabs don't paint over the edge.
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(bottom = stroke)
+                .background(
+                    color = background,
+                    shape = RoundedCornerShape(topStart = corner, topEnd = corner),
+                ),
+        )
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
@@ -365,15 +422,10 @@ private fun FilingCabinetTab(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .background(
-                    color = background,
-                    shape = RoundedCornerShape(topStart = corner, topEnd = corner),
-                )
                 .drawBehind {
                     val strokePx = stroke.toPx()
                     val inset = strokePx / 2f
                     val radius = corner.toPx()
-                    // Open bottom for every tab — the folder baseline is the shared edge.
                     val path = Path().apply {
                         moveTo(inset, size.height)
                         lineTo(inset, radius)
@@ -390,17 +442,6 @@ private fun FilingCabinetTab(
                 }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         )
-        if (selected) {
-            // Punch a gap in the folder baseline so the tab opens into the content.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = stroke)
-                    .height(stroke)
-                    .background(MaterialTheme.colorScheme.surface),
-            )
-        }
     }
 }
 

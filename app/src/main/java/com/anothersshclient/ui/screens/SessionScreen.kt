@@ -82,6 +82,7 @@ import com.anothersshclient.session.SessionManager
 import com.anothersshclient.ssh.SshTransport
 import com.anothersshclient.terminal.AppTerminalClients
 import com.anothersshclient.terminal.NoOpTerminalSessionClient
+import com.anothersshclient.ui.theme.appTerminalTheme
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -622,6 +623,7 @@ private fun startSession(
         port = pending.port,
         username = pending.username,
         password = password,
+        terminalTheme = appTerminalTheme(),
     )
     val terminal = TerminalSession(
         transport,

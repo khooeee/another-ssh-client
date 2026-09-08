@@ -1,5 +1,6 @@
 package com.anothersshclient.ssh
 
+import com.anothersshclient.ui.theme.TerminalTheme
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalTransport
 import java.io.OutputStream
@@ -21,6 +22,7 @@ class SshTransport(
     private val port: Int,
     private val username: String,
     private val password: String,
+    private val terminalTheme: TerminalTheme = TerminalTheme.Light,
 ) : TerminalTransport {
 
     private var client: SSHClient? = null
@@ -67,6 +69,15 @@ class SshTransport(
                 session = sess
                 sessionChannel = sess as? SessionChannel
                 out = shell.outputStream
+                // Advertise app terminal theme to remote CLIs (Cursor agent, etc.).
+                // SSH AcceptEnv often blocks TERM_THEME, so inject after the shell starts.
+                // May briefly appear as typed input in the transcript.
+                runCatching {
+                    val bytes = terminalTheme.shellExportCommand()
+                        .toByteArray(StandardCharsets.UTF_8)
+                    out?.write(bytes)
+                    out?.flush()
+                }
 
                 val input = shell.inputStream
                 val buf = ByteArray(8192)

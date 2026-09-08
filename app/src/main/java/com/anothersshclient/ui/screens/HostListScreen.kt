@@ -533,7 +533,7 @@ private fun HostEditorDialog(
                 OutlinedTextField(
                     value = startupDirectory,
                     onValueChange = { startupDirectory = it },
-                    label = { Text("Startup directory") },
+                    label = { Text("Start directory") },
                     singleLine = true,
                     colors = fieldColors,
                     supportingText = {

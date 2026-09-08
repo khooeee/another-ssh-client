@@ -64,9 +64,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -538,13 +540,22 @@ private fun HostEditorDialog(
     onDismiss: () -> Unit,
     onSave: (HostProfile, String?) -> Unit,
 ) {
-    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var name by remember {
+        val initialName = initial?.name.orEmpty()
+        mutableStateOf(
+            TextFieldValue(
+                text = initialName,
+                selection = TextRange(0, initialName.length),
+            ),
+        )
+    }
     var host by remember { mutableStateOf(initial?.host.orEmpty()) }
     var port by remember { mutableStateOf((initial?.port ?: 22).toString()) }
     var username by remember { mutableStateOf(initial?.username.orEmpty()) }
     var startupCommand by remember { mutableStateOf(initial?.startupCommand.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var passwordLoaded by remember { mutableStateOf(initial == null) }
+    val nameFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(initial?.id) {
         if (initial != null) {
@@ -553,7 +564,11 @@ private fun HostEditorDialog(
         }
     }
 
-    val trimmedName = name.trim()
+    LaunchedEffect(Unit) {
+        nameFocusRequester.requestFocus()
+    }
+
+    val trimmedName = name.text.trim()
     val nameTaken = trimmedName.isNotEmpty() &&
         existingHosts.any { other ->
             other.id != initial?.id && other.name.equals(trimmedName, ignoreCase = true)
@@ -620,7 +635,10 @@ private fun HostEditorDialog(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { saveIfAllowed() }),
                     colors = fieldColors,
-                    modifier = Modifier.fillMaxWidth().then(saveOnEnterModifier),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(nameFocusRequester)
+                        .then(saveOnEnterModifier),
                 )
                 OutlinedTextField(
                     value = host,

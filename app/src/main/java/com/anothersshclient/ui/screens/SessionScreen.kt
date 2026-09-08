@@ -9,10 +9,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,14 +22,14 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -90,6 +90,8 @@ import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
 import com.termux.view.TerminalViewClient
 import java.util.Properties
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 private val SessionChromePaddingHorizontal: Dp = 16.dp
 private val SessionChromePaddingVertical: Dp = 12.dp
@@ -238,37 +240,52 @@ fun SessionScreen(
                     val edgeStroke = with(LocalDensity.current) { 1.dp.toPx() }
                     var stripCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
                     var selectedTabGap by remember(activeId) { mutableStateOf<Rect?>(null) }
+                    val tabListState = rememberLazyListState()
+                    val reorderableTabState = rememberReorderableLazyListState(tabListState) { from, to ->
+                        sessionManager.reorder(from.index, to.index)
+                    }
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .onGloballyPositioned { stripCoords = it },
                     ) {
-                        Row(
+                        LazyRow(
+                            state = tabListState,
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = SessionChromePaddingHorizontal),
+                                .fillMaxWidth()
+                                .focusProperties { canFocus = false },
+                            contentPadding = PaddingValues(horizontal = SessionChromePaddingHorizontal),
                             verticalAlignment = Alignment.Bottom,
                         ) {
-                            sessions.forEachIndexed { index, session ->
-                                val selected = session.id == activeId
-                                FilingCabinetTab(
-                                    label = sessionManager.label(session),
-                                    selected = selected,
-                                    // Share side walls: only the first tab draws a leading edge.
-                                    drawLeadingEdge = index == 0,
-                                    onClick = { sessionManager.setActive(session.id) },
-                                    onRename = { renamingSession = session },
-                                    modifier = Modifier
-                                        .onGloballyPositioned { tabCoords ->
-                                            if (!selected) return@onGloballyPositioned
-                                            val strip = stripCoords ?: return@onGloballyPositioned
-                                            if (strip.isAttached && tabCoords.isAttached) {
-                                                selectedTabGap = strip.localBoundingBoxOf(tabCoords)
-                                            }
-                                        },
-                                )
+                            items(sessions, key = { it.id }) { session ->
+                                ReorderableItem(reorderableTabState, key = session.id) { isDragging ->
+                                    val index = sessions.indexOfFirst { it.id == session.id }
+                                    val selected = session.id == activeId
+                                    FilingCabinetTab(
+                                        label = sessionManager.label(session),
+                                        selected = selected,
+                                        isDragging = isDragging,
+                                        // Share side walls: only the first tab draws a leading edge.
+                                        drawLeadingEdge = index == 0,
+                                        onClick = { sessionManager.setActive(session.id) },
+                                        onRename = { renamingSession = session },
+                                        dragHandleModifier = Modifier.longPressDraggableHandle(
+                                            onDragStarted = {
+                                                sessionManager.setActive(session.id)
+                                            },
+                                        ),
+                                        modifier = Modifier
+                                            .onGloballyPositioned { tabCoords ->
+                                                if (!selected) return@onGloballyPositioned
+                                                val strip = stripCoords ?: return@onGloballyPositioned
+                                                if (strip.isAttached && tabCoords.isAttached) {
+                                                    selectedTabGap = strip.localBoundingBoxOf(tabCoords)
+                                                }
+                                            },
+                                    )
+                                }
                             }
                         }
                         Canvas(
@@ -454,28 +471,35 @@ fun SessionScreen(
 private fun FilingCabinetTab(
     label: String,
     selected: Boolean,
+    isDragging: Boolean,
     drawLeadingEdge: Boolean,
     onClick: () -> Unit,
     onRename: () -> Unit,
+    dragHandleModifier: Modifier,
     modifier: Modifier = Modifier,
 ) {
     val stroke = 1.dp
-    val background = if (selected) {
+    val background = if (selected || isDragging) {
         MaterialTheme.colorScheme.surface
     } else {
         MaterialTheme.colorScheme.surfaceVariant
     }
     val outline = MaterialTheme.colorScheme.outline
-    var menuExpanded by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
-            .zIndex(if (selected) 2f else 1f)
+            .zIndex(when {
+                isDragging -> 3f
+                selected -> 2f
+                else -> 1f
+            })
+            .then(dragHandleModifier)
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
-                onLongClick = { menuExpanded = true },
+                // Long-press is drag-to-reorder (same as host list); double-tap renames.
+                onDoubleClick = onRename,
             )
             .focusProperties { canFocus = false },
     ) {
@@ -516,19 +540,6 @@ private fun FilingCabinetTab(
                 }
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         )
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-        ) {
-            DropdownMenuItem(
-                text = { Text("Rename") },
-                onClick = {
-                    menuExpanded = false
-                    onRename()
-                },
-            )
-        }
     }
 }
 

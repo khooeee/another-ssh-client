@@ -112,6 +112,17 @@ class SessionManager {
         _activeId.value = list[next].id
     }
 
+    /** Reorder open sessions (tab strip). Active selection follows by id. */
+    fun reorder(fromIndex: Int, toIndex: Int) {
+        if (fromIndex == toIndex) return
+        _sessions.update { list ->
+            if (fromIndex !in list.indices || toIndex !in list.indices) return@update list
+            list.toMutableList().apply {
+                add(toIndex, removeAt(fromIndex))
+            }
+        }
+    }
+
     fun register(
         pending: PendingOpen,
         terminalSession: TerminalSession,

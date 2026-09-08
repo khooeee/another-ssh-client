@@ -8,11 +8,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -24,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -42,8 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
@@ -195,22 +196,37 @@ fun SessionScreen(
                 }
 
                 if (sessions.isNotEmpty()) {
-                    Row(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
                             .padding(horizontal = SessionChromePaddingHorizontal),
-                        verticalAlignment = Alignment.Bottom,
                     ) {
-                        sessions.forEachIndexed { index, session ->
-                            FilingCabinetTab(
-                                label = sessionManager.label(session),
-                                selected = session.id == activeId,
-                                onClick = { sessionManager.setActive(session.id) },
-                                modifier = Modifier
-                                    .widthIn(min = 72.dp)
-                                    .offset(x = if (index > 0) (-1).dp else 0.dp),
-                            )
+                        // Manila folder edge — continuous under inactive tabs / empty space.
+                        HorizontalDivider(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .zIndex(0f),
+                            color = MaterialTheme.colorScheme.outline,
+                            thickness = 1.dp,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .zIndex(1f)
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.Bottom,
+                        ) {
+                            sessions.forEachIndexed { index, session ->
+                                FilingCabinetTab(
+                                    label = sessionManager.label(session),
+                                    selected = session.id == activeId,
+                                    onClick = { sessionManager.setActive(session.id) },
+                                    modifier = Modifier
+                                        .widthIn(min = 72.dp)
+                                        .offset(x = if (index > 0) (-1).dp else 0.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -334,60 +350,61 @@ private fun FilingCabinetTab(
     }
     val outline = MaterialTheme.colorScheme.outline
 
-    Text(
-        text = label,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
+    Box(
         modifier = modifier
-            .zIndex(if (selected) 1f else 0f)
+            .zIndex(if (selected) 2f else 1f)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick,
             )
-            .focusProperties { canFocus = false }
-            .background(
-                color = background,
-                shape = RoundedCornerShape(topStart = corner, topEnd = corner),
-            )
-            .drawBehind {
-                val strokePx = stroke.toPx()
-                val inset = strokePx / 2f
-                val radius = corner.toPx()
-                val path = Path()
-                if (selected) {
-                    // Left + rounded top + right only — no bottom edge.
-                    path.moveTo(inset, size.height)
-                    path.lineTo(inset, radius)
-                    path.quadraticTo(inset, inset, radius, inset)
-                    path.lineTo(size.width - radius, inset)
-                    path.quadraticTo(size.width - inset, inset, size.width - inset, radius)
-                    path.lineTo(size.width - inset, size.height)
-                } else {
-                    path.addRoundRect(
-                        RoundRect(
-                            left = inset,
-                            top = inset,
-                            right = size.width - inset,
-                            bottom = size.height - inset,
-                            topLeftCornerRadius = CornerRadius(radius),
-                            topRightCornerRadius = CornerRadius(radius),
-                            bottomLeftCornerRadius = CornerRadius.Zero,
-                            bottomRightCornerRadius = CornerRadius.Zero,
-                        ),
+            .focusProperties { canFocus = false },
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .background(
+                    color = background,
+                    shape = RoundedCornerShape(topStart = corner, topEnd = corner),
+                )
+                .drawBehind {
+                    val strokePx = stroke.toPx()
+                    val inset = strokePx / 2f
+                    val radius = corner.toPx()
+                    // Open bottom for every tab — the folder baseline is the shared edge.
+                    val path = Path().apply {
+                        moveTo(inset, size.height)
+                        lineTo(inset, radius)
+                        quadraticTo(inset, inset, radius, inset)
+                        lineTo(size.width - radius, inset)
+                        quadraticTo(size.width - inset, inset, size.width - inset, radius)
+                        lineTo(size.width - inset, size.height)
+                    }
+                    drawPath(
+                        path = path,
+                        color = outline,
+                        style = Stroke(width = strokePx),
                     )
                 }
-                drawPath(
-                    path = path,
-                    color = outline,
-                    style = Stroke(width = strokePx),
-                )
-            }
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    )
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+        if (selected) {
+            // Punch a gap in the folder baseline so the tab opens into the content.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = stroke)
+                    .height(stroke)
+                    .background(MaterialTheme.colorScheme.surface),
+            )
+        }
+    }
 }
 
 private fun startSession(

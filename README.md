@@ -5,7 +5,7 @@ Android SSH client aimed at Daylight DC-1's greyscale Live Paper display.
 ## Features
 
 - Multiple concurrent sessions
-- Customize start command per host (e.g. `cd ~/code && tmux a`)
+- Customize start command per host (e.g. `cd ~/code && tmux`)
 - Hosts & sessions can be reordered by dragging
 - Double press the session tab to rename it
 - Keyboard driven

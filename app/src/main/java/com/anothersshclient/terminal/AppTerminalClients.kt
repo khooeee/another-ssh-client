@@ -41,7 +41,8 @@ class AppTerminalClients(
     }
 
     override fun onSingleTapUp(e: MotionEvent) {
-        terminalView.requestFocus()
+        // Focus alone does not reopen the IME after a hardware keyboard was connected.
+        showSoftKeyboard(context, terminalView)
     }
 
     override fun shouldBackButtonBeMappedToEscape(): Boolean = false

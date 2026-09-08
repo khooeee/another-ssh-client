@@ -172,6 +172,7 @@ fun HostListScreen(
     if (showEditor) {
         HostEditorDialog(
             initial = editing,
+            existingHosts = hosts,
             loadPassword = { id -> viewModel.passwordFor(id) },
             onDismiss = { showEditor = false },
             onSave = { profile, password ->
@@ -215,6 +216,7 @@ private fun HostRow(
 @Composable
 private fun HostEditorDialog(
     initial: HostProfile?,
+    existingHosts: List<HostProfile>,
     loadPassword: suspend (String) -> String?,
     onDismiss: () -> Unit,
     onSave: (HostProfile, String?) -> Unit,
@@ -233,8 +235,15 @@ private fun HostEditorDialog(
         }
     }
 
+    val trimmedName = name.trim()
+    val nameTaken = trimmedName.isNotEmpty() &&
+        existingHosts.any { other ->
+            other.id != initial?.id && other.name.equals(trimmedName, ignoreCase = true)
+        }
+
     val canSave = passwordLoaded &&
-        name.isNotBlank() &&
+        trimmedName.isNotEmpty() &&
+        !nameTaken &&
         host.isNotBlank() &&
         username.isNotBlank() &&
         port.toIntOrNull()?.let { it in 1..65535 } == true
@@ -244,6 +253,10 @@ private fun HostEditorDialog(
         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
         cursorColor = MaterialTheme.colorScheme.onSurface,
         focusedLabelColor = MaterialTheme.colorScheme.onSurface,
+        errorBorderColor = MaterialTheme.colorScheme.outline,
+        errorLabelColor = MaterialTheme.colorScheme.onSurface,
+        errorCursorColor = MaterialTheme.colorScheme.onSurface,
+        errorSupportingTextColor = MaterialTheme.colorScheme.onSurface,
     )
 
     AlertDialog(
@@ -256,6 +269,12 @@ private fun HostEditorDialog(
                     onValueChange = { name = it },
                     label = { Text("Name") },
                     singleLine = true,
+                    isError = nameTaken,
+                    supportingText = if (nameTaken) {
+                        { Text("That name already exists. Choose another one.") }
+                    } else {
+                        null
+                    },
                     colors = fieldColors,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -305,7 +324,7 @@ private fun HostEditorDialog(
                     onSave(
                         HostProfile(
                             id = initial?.id ?: HostRepository.newId(),
-                            name = name.trim(),
+                            name = trimmedName,
                             host = host.trim(),
                             port = port.toInt(),
                             username = username.trim(),

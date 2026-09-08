@@ -63,9 +63,11 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -514,9 +516,16 @@ private fun RenameSessionDialog(
     onDismiss: () -> Unit,
     onRename: (String) -> Unit,
 ) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
+    var name by remember(initialName) {
+        mutableStateOf(
+            TextFieldValue(
+                text = initialName,
+                selection = TextRange(0, initialName.length),
+            ),
+        )
+    }
     val focusRequester = remember { FocusRequester() }
-    val trimmed = name.trim()
+    val trimmed = name.text.trim()
     val nameTaken = trimmed.isNotEmpty() &&
         !trimmed.equals(initialName, ignoreCase = true) &&
         otherTitles.any { it.equals(trimmed, ignoreCase = true) }
@@ -558,7 +567,7 @@ private fun RenameSessionDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onRename(name) },
+                onClick = { onRename(name.text) },
                 enabled = trimmed.isNotEmpty() && !nameTaken,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

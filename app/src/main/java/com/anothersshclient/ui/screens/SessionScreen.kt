@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -65,6 +66,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
@@ -540,6 +542,8 @@ private fun RenameSessionDialog(
         errorSupportingTextColor = MaterialTheme.colorScheme.onSurface,
     )
 
+    val canRename = trimmed.isNotEmpty() && !nameTaken
+
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
@@ -559,16 +563,30 @@ private fun RenameSessionDialog(
                 } else {
                     null
                 },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        if (canRename) onRename(name.text)
+                    },
+                ),
                 colors = colors,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (event.key != Key.Enter && event.key != Key.NumPadEnter) {
+                            return@onPreviewKeyEvent false
+                        }
+                        if (canRename) onRename(name.text)
+                        true
+                    },
             )
         },
         confirmButton = {
             Button(
                 onClick = { onRename(name.text) },
-                enabled = trimmed.isNotEmpty() && !nameTaken,
+                enabled = canRename,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,

@@ -1,6 +1,7 @@
 package com.anothersshclient.ui.screens
 
 import android.graphics.Typeface
+import android.os.Build
 import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
@@ -299,6 +300,11 @@ fun SessionScreen(
                             setTypeface(Typeface.MONOSPACE)
                             isFocusable = true
                             isFocusableInTouchMode = true
+                            // Keyboard focus (e.g. Enter from host list) otherwise draws Android's
+                            // default focus highlight as a dark wash over the paper terminal.
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                defaultFocusHighlightEnabled = false
+                            }
                         }
                         val baseClients = AppTerminalClients(
                             context = ctx,

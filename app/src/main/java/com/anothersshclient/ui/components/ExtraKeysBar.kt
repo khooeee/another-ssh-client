@@ -56,6 +56,10 @@ fun ExtraKeysBar(
                 sendKey(terminalView, KeyEvent.KEYCODE_TAB)
                 state.consumeOneShot()
             })
+            ExtraKeyButton(label = "PASTE", onClick = {
+                terminalView?.currentSession?.onPasteTextFromClipboard()
+                state.consumeOneShot()
+            })
             ExtraKeyButton(
                 label = "CTRL",
                 active = state.ctrl,

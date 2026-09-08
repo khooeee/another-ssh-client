@@ -51,7 +51,18 @@ class AppTerminalClients(
     override fun isTerminalViewSelected(): Boolean = true
     override fun copyModeChanged(copyMode: Boolean) = Unit
 
-    override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean = false
+    override fun onKeyDown(keyCode: Int, e: KeyEvent, session: TerminalSession): Boolean {
+        val ctrl = e.isCtrlPressed || readControlKey()
+        val shift = e.isShiftPressed || readShiftKey()
+        // Ctrl+Shift+V pastes; bare Ctrl+V stays ^V for remote programs.
+        if (ctrl && shift && keyCode == KeyEvent.KEYCODE_V) {
+            onPasteTextFromClipboard(session)
+            extraKeys.consumeOneShot()
+            return true
+        }
+        return false
+    }
+
     override fun onKeyUp(keyCode: Int, e: KeyEvent): Boolean = false
     override fun onLongPress(event: MotionEvent): Boolean = false
 
@@ -88,7 +99,7 @@ class AppTerminalClients(
     override fun onPasteTextFromClipboard(session: TerminalSession?) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val text = clipboard.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString() ?: return
-        session?.write(text)
+        session?.emulator?.paste(text)
     }
 
     override fun onBell(session: TerminalSession) = Unit

@@ -169,6 +169,10 @@ fun SessionScreen(
                     leaveToNewSession()
                     true
                 }
+                event.key == Key.R && event.isShiftPressed -> {
+                    active?.let { renamingSession = it }
+                    true
+                }
                 else -> false
             }
         },
@@ -345,6 +349,12 @@ fun SessionScreen(
                                     KeyEvent.KEYCODE_N -> {
                                         if (e.isShiftPressed) {
                                             leaveToNewSession()
+                                            return true
+                                        }
+                                    }
+                                    KeyEvent.KEYCODE_R -> {
+                                        if (e.isShiftPressed) {
+                                            active?.let { renamingSession = it }
                                             return true
                                         }
                                     }

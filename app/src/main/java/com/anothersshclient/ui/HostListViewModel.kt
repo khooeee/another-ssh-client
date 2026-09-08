@@ -11,6 +11,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+/** Survives leaving the host list so selection can be restored on return. */
+sealed interface RememberedHostSelection {
+    data object Fab : RememberedHostSelection
+    data class Host(val id: String) : RememberedHostSelection
+}
+
 class HostListViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = HostRepository(application)
 
@@ -23,6 +29,13 @@ class HostListViewModel(application: Application) : AndroidViewModel(application
             initialValue = null,
         )
 
+    var rememberedSelection: RememberedHostSelection? = null
+        private set
+
+    fun rememberSelection(selection: RememberedHostSelection) {
+        rememberedSelection = selection
+    }
+
     fun save(profile: HostProfile, password: String?) {
         viewModelScope.launch {
             repository.upsert(profile, password)
@@ -32,6 +45,10 @@ class HostListViewModel(application: Application) : AndroidViewModel(application
     fun delete(id: String) {
         viewModelScope.launch {
             repository.delete(id)
+        }
+        val remembered = rememberedSelection
+        if (remembered is RememberedHostSelection.Host && remembered.id == id) {
+            rememberedSelection = null
         }
     }
 

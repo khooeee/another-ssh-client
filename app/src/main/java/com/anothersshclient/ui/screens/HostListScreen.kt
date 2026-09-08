@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
 import com.anothersshclient.ui.HostListViewModel
+import com.anothersshclient.ui.RememberedHostSelection
 import com.anothersshclient.ui.components.TypewriterBrandTitle
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -99,15 +100,34 @@ fun HostListScreen(
     var selection by remember { mutableStateOf<HostListSelection?>(null) }
     var didInitialSelection by remember { mutableStateOf(false) }
 
+    fun rememberCurrentSelection(selected: HostListSelection?) {
+        when (selected) {
+            HostListSelection.Fab -> viewModel.rememberSelection(RememberedHostSelection.Fab)
+            is HostListSelection.Host -> {
+                val id = hosts.getOrNull(selected.index)?.id ?: return
+                viewModel.rememberSelection(RememberedHostSelection.Host(id))
+            }
+            null -> Unit
+        }
+    }
+
+    fun selectionFromRemembered(loaded: List<HostProfile>): HostListSelection {
+        if (loaded.isEmpty()) return HostListSelection.Fab
+        return when (val remembered = viewModel.rememberedSelection) {
+            RememberedHostSelection.Fab -> HostListSelection.Fab
+            is RememberedHostSelection.Host -> {
+                val index = loaded.indexOfFirst { it.id == remembered.id }
+                if (index >= 0) HostListSelection.Host(index) else HostListSelection.Host(0)
+            }
+            null -> HostListSelection.Host(0)
+        }
+    }
+
     // App-owned selection: do not rely on Compose focus, which is flaky on cold start.
     LaunchedEffect(hostsState) {
         val loaded = hostsState ?: return@LaunchedEffect
         if (!didInitialSelection) {
-            selection = if (loaded.isEmpty()) {
-                HostListSelection.Fab
-            } else {
-                HostListSelection.Host(0)
-            }
+            selection = selectionFromRemembered(loaded)
             didInitialSelection = true
             return@LaunchedEffect
         }
@@ -117,12 +137,13 @@ fun HostListScreen(
             current is HostListSelection.Host && current.index >= loaded.size -> {
                 HostListSelection.Host(loaded.lastIndex)
             }
-            current == null -> HostListSelection.Host(0)
+            current == null -> selectionFromRemembered(loaded)
             else -> current
         }
     }
 
-    LaunchedEffect(selection) {
+    LaunchedEffect(selection, hosts) {
+        rememberCurrentSelection(selection)
         val selected = selection as? HostListSelection.Host ?: return@LaunchedEffect
         listState.scrollToItem(selected.index + 1)
     }

@@ -196,12 +196,8 @@ fun SessionScreen(
                 }
 
                 if (sessions.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = SessionChromePaddingHorizontal),
-                    ) {
-                        // Manila folder edge — continuous under inactive tabs / empty space.
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        // Manila folder edge — full width, including side chrome padding.
                         HorizontalDivider(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
@@ -214,7 +210,8 @@ fun SessionScreen(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .zIndex(1f)
-                                .horizontalScroll(rememberScrollState()),
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = SessionChromePaddingHorizontal),
                             verticalAlignment = Alignment.Bottom,
                         ) {
                             sessions.forEachIndexed { index, session ->

@@ -537,7 +537,7 @@ private fun HostEditorDialog(
                     singleLine = true,
                     colors = fieldColors,
                     supportingText = {
-                        Text("Optional. cd here after connect (e.g. ~/code or /var/www).")
+                        Text("Optional. cd here after connect (e.g. ~/code, \$HOME/code).")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )

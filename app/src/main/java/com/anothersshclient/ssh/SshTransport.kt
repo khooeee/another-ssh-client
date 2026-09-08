@@ -142,7 +142,7 @@ class SshTransport(
             val dir = startupDirectory?.trim().orEmpty()
             if (dir.isNotEmpty()) {
                 append("cd ")
-                append(shellSingleQuote(dir))
+                append(formatCdTarget(dir))
                 append('\n')
             }
             // Advertise app terminal theme to remote CLIs (Cursor agent, etc.).
@@ -150,9 +150,36 @@ class SshTransport(
             append(terminalTheme.shellExportCommand())
         }
 
-        /** POSIX-safe single-quoted string for paths that may contain spaces or quotes. */
-        internal fun shellSingleQuote(value: String): String =
-            "'" + value.replace("'", "'\\''") + "'"
+        /**
+         * Quote a path for `cd` so spaces are safe but shell expansions still work:
+         * - leading `~` / `~/` stay unquoted (tilde expansion)
+         * - double quotes allow `$HOME` / `${HOME}` (single quotes would not)
+         */
+        internal fun formatCdTarget(path: String): String {
+            if (path == "~") return "~"
+            if (path.startsWith("~/")) {
+                return "~/" + shellDoubleQuote(path.removePrefix("~/"))
+            }
+            return shellDoubleQuote(path)
+        }
+
+        /**
+         * Double-quote [value], escaping `\`, `"`, and `` ` ``, but leaving `$` intact
+         * so `$HOME` / `${VAR}` expand.
+         */
+        internal fun shellDoubleQuote(value: String): String = buildString(value.length + 2) {
+            append('"')
+            for (c in value) {
+                when (c) {
+                    '\\', '"', '`' -> {
+                        append('\\')
+                        append(c)
+                    }
+                    else -> append(c)
+                }
+            }
+            append('"')
+        }
     }
 }
 

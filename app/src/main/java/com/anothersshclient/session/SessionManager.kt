@@ -168,9 +168,17 @@ class SessionManager {
     }
 
     private fun remove(id: String) {
-        _sessions.update { list -> list.filterNot { it.id == id } }
-        if (_activeId.value == id) {
-            _activeId.value = _sessions.value.lastOrNull()?.id
+        val list = _sessions.value
+        val index = list.indexOfFirst { it.id == id }
+        val wasActive = _activeId.value == id
+        _sessions.update { sessions -> sessions.filterNot { it.id == id } }
+        if (!wasActive || index < 0) return
+        val remaining = _sessions.value
+        if (remaining.isEmpty()) {
+            _activeId.value = null
+            return
         }
+        // Prefer the tab that shifted into this index (former next); if we closed the last, take previous.
+        _activeId.value = remaining.getOrNull(index)?.id ?: remaining.last().id
     }
 }

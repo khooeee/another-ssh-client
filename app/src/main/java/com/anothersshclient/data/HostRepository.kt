@@ -60,6 +60,15 @@ class HostRepository(context: Context) {
         vault.get(hostId)
     }
 
+    /** Persist a new host order (ids must match the current set). */
+    suspend fun reorder(ordered: List<HostProfile>) {
+        withContext(Dispatchers.IO) {
+            appContext.hostDataStore.edit { prefs ->
+                prefs[hostsKey] = encode(ordered.map { it.copy(hasPassword = false) })
+            }
+        }
+    }
+
     companion object {
         fun newId(): String = UUID.randomUUID().toString()
 

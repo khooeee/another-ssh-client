@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
@@ -71,6 +72,8 @@ import com.anothersshclient.ui.HostListViewModel
 import com.anothersshclient.ui.RememberedHostSelection
 import com.anothersshclient.ui.components.TypewriterBrandTitle
 import kotlinx.coroutines.suspendCancellableCoroutine
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlin.coroutines.resume
 
 private sealed interface HostListSelection {
@@ -87,7 +90,11 @@ fun HostListScreen(
     onOpenSessions: () -> Unit = {},
 ) {
     val hostsState by viewModel.hosts.collectAsStateWithLifecycle()
-    val hosts = hostsState.orEmpty()
+    val hostsFromStore = hostsState.orEmpty()
+    var hosts by remember { mutableStateOf(hostsFromStore) }
+    LaunchedEffect(hostsFromStore) {
+        hosts = hostsFromStore
+    }
     var editing by remember { mutableStateOf<HostProfile?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<HostProfile?>(null) }
@@ -99,6 +106,24 @@ fun HostListScreen(
 
     var selection by remember { mutableStateOf<HostListSelection?>(null) }
     var didInitialSelection by remember { mutableStateOf(false) }
+
+    // Header divider is lazy index 0; host rows start at 1.
+    val reorderableLazyListState = rememberReorderableLazyListState(listState) { from, to ->
+        val fromIndex = from.index - 1
+        val toIndex = to.index - 1
+        if (fromIndex !in hosts.indices || toIndex !in hosts.indices) return@rememberReorderableLazyListState
+        val selectedId = (selection as? HostListSelection.Host)
+            ?.let { hosts.getOrNull(it.index)?.id }
+        val updated = hosts.toMutableList().apply {
+            add(toIndex, removeAt(fromIndex))
+        }
+        hosts = updated
+        if (selectedId != null) {
+            val newIndex = updated.indexOfFirst { it.id == selectedId }
+            if (newIndex >= 0) selection = HostListSelection.Host(newIndex)
+        }
+        viewModel.reorder(updated)
+    }
 
     fun rememberCurrentSelection(selected: HostListSelection?) {
         when (selected) {
@@ -324,28 +349,38 @@ fun HostListScreen(
                     .focusProperties { canFocus = false },
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             ) {
-                item {
+                item(key = "host-list-top-divider") {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 }
-                itemsIndexed(hosts, key = { _, host -> host.id }) { index, host ->
-                    HostRow(
-                        host = host,
-                        selected = selection == HostListSelection.Host(index),
-                        onOpen = {
-                            selection = HostListSelection.Host(index)
-                            onConnect(host)
-                        },
-                        onEdit = {
-                            selection = HostListSelection.Host(index)
-                            editing = host
-                            showEditor = true
-                        },
-                        onDelete = {
-                            selection = HostListSelection.Host(index)
-                            pendingDelete = host
-                        },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                items(hosts, key = { it.id }) { host ->
+                    ReorderableItem(reorderableLazyListState, key = host.id) { isDragging ->
+                        val index = hosts.indexOfFirst { it.id == host.id }
+                        HostRow(
+                            host = host,
+                            selected = selection == HostListSelection.Host(index),
+                            isDragging = isDragging,
+                            dragHandleModifier = Modifier.longPressDraggableHandle(
+                                onDragStarted = {
+                                    if (index >= 0) {
+                                        selection = HostListSelection.Host(index)
+                                    }
+                                },
+                            ),
+                            onOpen = {
+                                if (index >= 0) selection = HostListSelection.Host(index)
+                                onConnect(host)
+                            },
+                            onEdit = {
+                                if (index >= 0) selection = HostListSelection.Host(index)
+                                editing = host
+                                showEditor = true
+                            },
+                            onDelete = {
+                                if (index >= 0) selection = HostListSelection.Host(index)
+                                pendingDelete = host
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -401,41 +436,50 @@ fun HostListScreen(
 private fun HostRow(
     host: HostProfile,
     selected: Boolean,
+    isDragging: Boolean,
+    dragHandleModifier: Modifier,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .focusProperties { canFocus = false }
-            .background(
-                if (selected) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface,
-            )
-            .clickable(onClick = onOpen)
-            .padding(vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .zIndex(if (isDragging) 1f else 0f)
+            .then(dragHandleModifier),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(host.name, style = MaterialTheme.typography.titleMedium)
-            Text(
-                "${host.username}@${host.host}:${host.port}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        IconButton(
-            onClick = onEdit,
-            modifier = Modifier.focusProperties { canFocus = false },
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusProperties { canFocus = false }
+                .background(
+                    if (selected || isDragging) MaterialTheme.colorScheme.surfaceVariant
+                    else MaterialTheme.colorScheme.surface,
+                )
+                .clickable(onClick = onOpen)
+                .padding(vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Edit, contentDescription = "Edit")
+            Column(modifier = Modifier.weight(1f)) {
+                Text(host.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${host.username}@${host.host}:${host.port}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            IconButton(
+                onClick = onEdit,
+                modifier = Modifier.focusProperties { canFocus = false },
+            ) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.focusProperties { canFocus = false },
+            ) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete")
+            }
         }
-        IconButton(
-            onClick = onDelete,
-            modifier = Modifier.focusProperties { canFocus = false },
-        ) {
-            Icon(Icons.Default.Delete, contentDescription = "Delete")
-        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
     }
 }
 

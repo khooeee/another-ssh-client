@@ -5,6 +5,7 @@ Native Kotlin / Jetpack Compose SSH client aimed at Daylight DC-1's greyscale Li
 ## Features
 
 - Multiple concurrent sessions
+- Customize start directory per host
 - Keyboard driven
   - Ctrl+Tab / Ctrl+Shift+Tab to cycle sessions
   - Ctrl+Shift+N to open a new session

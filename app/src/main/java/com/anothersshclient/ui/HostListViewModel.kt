@@ -52,5 +52,11 @@ class HostListViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun reorder(ordered: List<HostProfile>) {
+        viewModelScope.launch {
+            repository.reorder(ordered)
+        }
+    }
+
     suspend fun passwordFor(hostId: String): String? = repository.getPassword(hostId)
 }

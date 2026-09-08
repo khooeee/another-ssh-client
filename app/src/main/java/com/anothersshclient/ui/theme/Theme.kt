@@ -1,22 +1,29 @@
 package com.anothersshclient.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.anothersshclient.data.ThemeMode
 
 // High-contrast greyscale tuned for Daylight Live Paper.
 private val PaperWhite = Color(0xFFFFFFFF)
 private val InkBlack = Color(0xFF000000)
 private val SoftGray = Color(0xFFEEEEEE)
 private val MidGray = Color(0xFF666666)
+private val DarkSurface = Color(0xFF111111)
+private val DarkSoftGray = Color(0xFF2A2A2A)
 
-private val PaperColorScheme = lightColorScheme(
+private val PaperLightColorScheme = lightColorScheme(
     primary = InkBlack,
     onPrimary = PaperWhite,
     secondary = InkBlack,
@@ -35,6 +42,25 @@ private val PaperColorScheme = lightColorScheme(
     onError = PaperWhite,
 )
 
+private val PaperDarkColorScheme = darkColorScheme(
+    primary = PaperWhite,
+    onPrimary = InkBlack,
+    secondary = PaperWhite,
+    onSecondary = InkBlack,
+    tertiary = MidGray,
+    onTertiary = PaperWhite,
+    background = InkBlack,
+    onBackground = PaperWhite,
+    surface = DarkSurface,
+    onSurface = PaperWhite,
+    surfaceVariant = DarkSoftGray,
+    onSurfaceVariant = PaperWhite,
+    outline = PaperWhite,
+    outlineVariant = MidGray,
+    error = PaperWhite,
+    onError = InkBlack,
+)
+
 private val PaperTypography = Typography(
     headlineMedium = TextStyle(
         fontFamily = JetBrainsMono,
@@ -42,7 +68,6 @@ private val PaperTypography = Typography(
         fontSize = 28.sp,
         lineHeight = 34.sp,
         letterSpacing = (-0.5).sp,
-        color = InkBlack,
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -82,11 +107,36 @@ private val PaperTypography = Typography(
     ),
 )
 
+val LocalThemeMode = staticCompositionLocalOf { ThemeMode.Light }
+
+val LocalTerminalTheme = staticCompositionLocalOf { TerminalTheme.Light }
+
+fun ThemeMode.resolveDark(isSystemDark: Boolean): Boolean = when (this) {
+    ThemeMode.Light -> false
+    ThemeMode.Dark -> true
+    ThemeMode.System -> isSystemDark
+}
+
+fun ThemeMode.toTerminalTheme(isSystemDark: Boolean): TerminalTheme =
+    if (resolveDark(isSystemDark)) TerminalTheme.Dark else TerminalTheme.Light
+
 @Composable
-fun AnotherSshClientTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = PaperColorScheme,
-        typography = PaperTypography,
-        content = content,
-    )
+fun AnotherSshClientTheme(
+    themeMode: ThemeMode = ThemeMode.Light,
+    content: @Composable () -> Unit,
+) {
+    val systemDark = isSystemInDarkTheme()
+    val darkTheme = themeMode.resolveDark(systemDark)
+    val terminalTheme = themeMode.toTerminalTheme(systemDark)
+
+    CompositionLocalProvider(
+        LocalThemeMode provides themeMode,
+        LocalTerminalTheme provides terminalTheme,
+    ) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) PaperDarkColorScheme else PaperLightColorScheme,
+            typography = PaperTypography,
+            content = content,
+        )
+    }
 }

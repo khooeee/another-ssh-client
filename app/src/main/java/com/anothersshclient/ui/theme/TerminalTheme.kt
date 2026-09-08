@@ -2,7 +2,7 @@ package com.anothersshclient.ui.theme
 
 /**
  * Light/dark hint for remote CLIs that probe the terminal (e.g. Cursor agent).
- * Today the app is paper-only (always light); flip [appTerminalTheme] when dark mode lands.
+ * Prefer [LocalTerminalTheme] over hard-coding.
  */
 enum class TerminalTheme {
     Light,
@@ -27,6 +27,3 @@ enum class TerminalTheme {
     fun shellExportCommand(): String =
         "export TERM_THEME=$termThemeEnv COLORFGBG='$colorFgBg'\n"
 }
-
-/** Source of truth for what theme hint new SSH sessions should advertise. */
-fun appTerminalTheme(): TerminalTheme = TerminalTheme.Light

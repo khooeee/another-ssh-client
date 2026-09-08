@@ -63,6 +63,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -76,13 +77,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anothersshclient.data.TerminalPreferences
 import com.anothersshclient.session.OpenSession
 import com.anothersshclient.session.PendingOpen
 import com.anothersshclient.session.SessionManager
 import com.anothersshclient.ssh.SshTransport
 import com.anothersshclient.terminal.AppTerminalClients
 import com.anothersshclient.terminal.NoOpTerminalSessionClient
-import com.anothersshclient.ui.theme.appTerminalTheme
+import com.anothersshclient.ui.theme.LocalTerminalTheme
+import com.anothersshclient.ui.theme.LocalThemeMode
+import com.anothersshclient.ui.theme.TerminalTheme
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -103,6 +107,11 @@ fun SessionScreen(
     val activeId by sessionManager.activeId.collectAsStateWithLifecycle()
     val pendingFlow by sessionManager.pendingOpen.collectAsStateWithLifecycle()
     val active = sessions.find { it.id == activeId }
+    val terminalTheme = LocalTerminalTheme.current
+    val terminalThemeLatest = rememberUpdatedState(terminalTheme)
+    val themeMode = LocalThemeMode.current
+    val context = LocalContext.current
+    val appearancePrefs = remember(context) { TerminalPreferences(context) }
 
     var awaitingPasswordFor by remember { mutableStateOf<PendingOpen?>(null) }
     var isStarting by remember { mutableStateOf(false) }
@@ -149,11 +158,18 @@ fun SessionScreen(
                 if (saved.isNullOrEmpty()) {
                     awaitingPasswordFor = pending
                 } else {
-                    startSession(sessionManager, pending, saved)
+                    startSession(sessionManager, pending, saved, terminalThemeLatest.value)
                 }
             } finally {
                 isStarting = false
             }
+        }
+    }
+
+    LaunchedEffect(terminalTheme, sessions) {
+        for (open in sessions) {
+            val session = open.terminalSession ?: continue
+            applyTerminalScheme(session, terminalTheme)
         }
     }
 
@@ -205,6 +221,12 @@ fun SessionScreen(
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
+                    }
+                    TextButton(
+                        onClick = { appearancePrefs.themeMode = themeMode.next() },
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
+                        Text(themeMode.label)
                     }
                     TextButton(
                         onClick = { leaveToNewSession() },
@@ -329,7 +351,7 @@ fun SessionScreen(
                         )
                         val viewClient = object : TerminalViewClient by baseClients {
                             override fun onEmulatorSet() {
-                                applyPaperScheme(terminal)
+                                applyTerminalScheme(terminal, terminalThemeLatest.value)
                                 baseClients.onEmulatorSet()
                                 view.requestFocus()
                             }
@@ -416,7 +438,7 @@ fun SessionScreen(
                 awaitingPasswordFor = null
                 isStarting = true
                 try {
-                    startSession(sessionManager, passwordTarget, password)
+                    startSession(sessionManager, passwordTarget, password, terminalThemeLatest.value)
                 } finally {
                     isStarting = false
                 }
@@ -617,13 +639,14 @@ private fun startSession(
     sessionManager: SessionManager,
     pending: PendingOpen,
     password: String,
+    terminalTheme: TerminalTheme,
 ) {
     val transport = SshTransport(
         host = pending.host,
         port = pending.port,
         username = pending.username,
         password = password,
-        terminalTheme = appTerminalTheme(),
+        terminalTheme = terminalTheme,
     )
     val terminal = TerminalSession(
         transport,
@@ -637,31 +660,57 @@ private fun startSession(
     sessionManager.register(pending, terminal)
 }
 
-private fun applyPaperScheme(session: TerminalSession) {
+private fun applyTerminalScheme(session: TerminalSession, theme: TerminalTheme) {
     val emulator = session.emulator ?: return
     val props = Properties().apply {
-        setProperty("foreground", "#000000")
-        setProperty("background", "#FFFFFF")
-        setProperty("cursor", "#000000")
-        setProperty("color0", "#000000")
-        setProperty("color1", "#444444")
-        setProperty("color2", "#555555")
-        setProperty("color3", "#666666")
-        setProperty("color4", "#777777")
-        setProperty("color5", "#888888")
-        setProperty("color6", "#999999")
-        setProperty("color7", "#BBBBBB")
-        setProperty("color8", "#333333")
-        setProperty("color9", "#555555")
-        setProperty("color10", "#666666")
-        setProperty("color11", "#777777")
-        setProperty("color12", "#888888")
-        setProperty("color13", "#999999")
-        setProperty("color14", "#AAAAAA")
-        setProperty("color15", "#000000")
+        when (theme) {
+            TerminalTheme.Light -> {
+                setProperty("foreground", "#000000")
+                setProperty("background", "#FFFFFF")
+                setProperty("cursor", "#000000")
+                setProperty("color0", "#000000")
+                setProperty("color1", "#444444")
+                setProperty("color2", "#555555")
+                setProperty("color3", "#666666")
+                setProperty("color4", "#777777")
+                setProperty("color5", "#888888")
+                setProperty("color6", "#999999")
+                setProperty("color7", "#BBBBBB")
+                setProperty("color8", "#333333")
+                setProperty("color9", "#555555")
+                setProperty("color10", "#666666")
+                setProperty("color11", "#777777")
+                setProperty("color12", "#888888")
+                setProperty("color13", "#999999")
+                setProperty("color14", "#AAAAAA")
+                setProperty("color15", "#000000")
+            }
+            TerminalTheme.Dark -> {
+                setProperty("foreground", "#FFFFFF")
+                setProperty("background", "#000000")
+                setProperty("cursor", "#FFFFFF")
+                setProperty("color0", "#000000")
+                setProperty("color1", "#888888")
+                setProperty("color2", "#999999")
+                setProperty("color3", "#AAAAAA")
+                setProperty("color4", "#BBBBBB")
+                setProperty("color5", "#CCCCCC")
+                setProperty("color6", "#DDDDDD")
+                setProperty("color7", "#EEEEEE")
+                setProperty("color8", "#666666")
+                setProperty("color9", "#999999")
+                setProperty("color10", "#AAAAAA")
+                setProperty("color11", "#BBBBBB")
+                setProperty("color12", "#CCCCCC")
+                setProperty("color13", "#DDDDDD")
+                setProperty("color14", "#EEEEEE")
+                setProperty("color15", "#FFFFFF")
+            }
+        }
     }
     TerminalColors.COLOR_SCHEME.updateWith(props)
     emulator.mColors.reset()
+    session.onColorsChanged()
 }
 
 @Composable

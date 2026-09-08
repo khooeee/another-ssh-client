@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -55,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -296,25 +298,22 @@ fun HostListScreen(
                 actions = {
                     if (openSessionCount > 0) {
                         val backSelected = selection is HostListSelection.BackToSession
+                        val backShape = RoundedCornerShape(percent = 50)
                         TextButton(
                             onClick = {
                                 selection = HostListSelection.BackToSession
                                 onOpenSessions()
                             },
+                            shape = backShape,
                             colors = ButtonDefaults.textButtonColors(
                                 containerColor = if (backSelected) {
                                     MaterialTheme.colorScheme.surfaceVariant
                                 } else {
-                                    MaterialTheme.colorScheme.surface
+                                    Color.Transparent
                                 },
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                             ),
-                            modifier = Modifier
-                                .focusProperties { canFocus = false }
-                                .border(
-                                    width = if (backSelected) 3.dp else 0.dp,
-                                    color = MaterialTheme.colorScheme.outline,
-                                ),
+                            modifier = Modifier.focusProperties { canFocus = false },
                         ) {
                             Text("Back to session")
                         }

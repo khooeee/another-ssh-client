@@ -620,17 +620,6 @@ private fun HostEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
-                    value = startupCommand,
-                    onValueChange = { startupCommand = it },
-                    label = { Text("Start command") },
-                    singleLine = true,
-                    colors = fieldColors,
-                    supportingText = {
-                        Text("Optional. Runs after connect (e.g. cd ~/code && tmux a).")
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
@@ -640,6 +629,17 @@ private fun HostEditorDialog(
                     colors = fieldColors,
                     supportingText = {
                         Text("Stored encrypted with Android Keystore. Leave blank to clear.")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = startupCommand,
+                    onValueChange = { startupCommand = it },
+                    label = { Text("Start command") },
+                    singleLine = true,
+                    colors = fieldColors,
+                    supportingText = {
+                        Text("Optional. Runs after connect (e.g. cd ~/code && tmux a).")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )

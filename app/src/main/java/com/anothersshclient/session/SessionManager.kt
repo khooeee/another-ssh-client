@@ -24,7 +24,7 @@ data class PendingOpen(
     val host: String,
     val port: Int,
     val username: String,
-    val startupDirectory: String? = null,
+    val startupCommand: String? = null,
 )
 
 /**
@@ -48,7 +48,7 @@ class SessionManager {
             host = profile.host,
             port = profile.port,
             username = profile.username,
-            startupDirectory = profile.startupDirectory,
+            startupCommand = profile.startupCommand,
         )
     }
 

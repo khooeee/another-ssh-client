@@ -23,7 +23,7 @@ class SshTransport(
     private val username: String,
     private val password: String,
     private val terminalTheme: TerminalTheme = TerminalTheme.Light,
-    private val startupDirectory: String? = null,
+    private val startupCommand: String? = null,
 ) : TerminalTransport {
 
     private var client: SSHClient? = null
@@ -72,7 +72,7 @@ class SshTransport(
                 out = shell.outputStream
                 // Startup commands appear briefly as typed input (same approach as theme hint).
                 runCatching {
-                    val startup = buildStartupCommands(startupDirectory, terminalTheme)
+                    val startup = buildStartupCommands(startupCommand, terminalTheme)
                     if (startup.isNotEmpty()) {
                         out?.write(startup.toByteArray(StandardCharsets.UTF_8))
                         out?.flush()
@@ -136,49 +136,17 @@ class SshTransport(
 
     companion object {
         internal fun buildStartupCommands(
-            startupDirectory: String?,
+            startupCommand: String?,
             terminalTheme: TerminalTheme,
         ): String = buildString {
-            val dir = startupDirectory?.trim().orEmpty()
-            if (dir.isNotEmpty()) {
-                append("cd ")
-                append(formatCdTarget(dir))
-                append('\n')
+            val cmd = startupCommand?.trim().orEmpty()
+            if (cmd.isNotEmpty()) {
+                append(cmd)
+                if (!cmd.endsWith('\n')) append('\n')
             }
             // Advertise app terminal theme to remote CLIs (Cursor agent, etc.).
             // SSH AcceptEnv often blocks TERM_THEME, so inject after the shell starts.
             append(terminalTheme.shellExportCommand())
-        }
-
-        /**
-         * Quote a path for `cd` so spaces are safe but shell expansions still work:
-         * - leading `~` / `~/` stay unquoted (tilde expansion)
-         * - double quotes allow `$HOME` / `${HOME}` (single quotes would not)
-         */
-        internal fun formatCdTarget(path: String): String {
-            if (path == "~") return "~"
-            if (path.startsWith("~/")) {
-                return "~/" + shellDoubleQuote(path.removePrefix("~/"))
-            }
-            return shellDoubleQuote(path)
-        }
-
-        /**
-         * Double-quote [value], escaping `\`, `"`, and `` ` ``, but leaving `$` intact
-         * so `$HOME` / `${VAR}` expand.
-         */
-        internal fun shellDoubleQuote(value: String): String = buildString(value.length + 2) {
-            append('"')
-            for (c in value) {
-                when (c) {
-                    '\\', '"', '`' -> {
-                        append('\\')
-                        append(c)
-                    }
-                    else -> append(c)
-                }
-            }
-            append('"')
         }
     }
 }

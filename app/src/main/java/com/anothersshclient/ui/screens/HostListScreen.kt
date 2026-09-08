@@ -540,7 +540,7 @@ private fun HostEditorDialog(
     var host by remember { mutableStateOf(initial?.host.orEmpty()) }
     var port by remember { mutableStateOf((initial?.port ?: 22).toString()) }
     var username by remember { mutableStateOf(initial?.username.orEmpty()) }
-    var startupDirectory by remember { mutableStateOf(initial?.startupDirectory.orEmpty()) }
+    var startupCommand by remember { mutableStateOf(initial?.startupCommand.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var passwordLoaded by remember { mutableStateOf(initial == null) }
 
@@ -620,13 +620,13 @@ private fun HostEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
-                    value = startupDirectory,
-                    onValueChange = { startupDirectory = it },
-                    label = { Text("Start directory") },
+                    value = startupCommand,
+                    onValueChange = { startupCommand = it },
+                    label = { Text("Start command") },
                     singleLine = true,
                     colors = fieldColors,
                     supportingText = {
-                        Text("Optional. cd here after connect (e.g. ~/code, \$HOME/code).")
+                        Text("Optional. Runs after connect (e.g. cd ~/code && tmux a).")
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -655,7 +655,7 @@ private fun HostEditorDialog(
                             host = host.trim(),
                             port = port.toInt(),
                             username = username.trim(),
-                            startupDirectory = startupDirectory.trim().ifEmpty { null },
+                            startupCommand = startupCommand.trim().ifEmpty { null },
                         ),
                         password,
                     )

@@ -6,8 +6,8 @@ data class HostProfile(
     val host: String,
     val port: Int = 22,
     val username: String,
-    /** Absolute or ~ path to cd into after connect. Blank/null = login default. */
-    val startupDirectory: String? = null,
+    /** Shell command typed after connect (e.g. `cd ~/code && tmux a`). Blank/null = none. */
+    val startupCommand: String? = null,
     /** True when a Keystore-encrypted password exists for this host. Never holds the secret itself. */
     val hasPassword: Boolean = false,
 )

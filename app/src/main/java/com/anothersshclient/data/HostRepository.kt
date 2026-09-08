@@ -82,7 +82,7 @@ class HostRepository(context: Context) {
                         .put("host", host.host)
                         .put("port", host.port)
                         .put("username", host.username)
-                        .put("startupDirectory", host.startupDirectory.orEmpty()),
+                        .put("startupCommand", host.startupCommand.orEmpty()),
                 )
             }
             return array.toString()
@@ -102,14 +102,47 @@ class HostRepository(context: Context) {
                                 host = obj.getString("host"),
                                 port = obj.optInt("port", 22),
                                 username = obj.getString("username"),
-                                startupDirectory = obj.optString("startupDirectory", "")
-                                    .trim()
-                                    .ifEmpty { null },
+                                startupCommand = readStartupCommand(obj),
                             ),
                         )
                     }
                 }
             }.getOrDefault(emptyList())
+        }
+
+        /**
+         * Prefer [startupCommand]. Legacy [startupDirectory] becomes `cd <path>` with the
+         * same quoting rules the old inject used.
+         */
+        private fun readStartupCommand(obj: JSONObject): String? {
+            if (obj.has("startupCommand")) {
+                return obj.optString("startupCommand", "").trim().ifEmpty { null }
+            }
+            val dir = obj.optString("startupDirectory", "").trim()
+            if (dir.isEmpty()) return null
+            return "cd ${formatCdTarget(dir)}"
+        }
+
+        private fun formatCdTarget(path: String): String {
+            if (path == "~") return "~"
+            if (path.startsWith("~/")) {
+                return "~/" + shellDoubleQuote(path.removePrefix("~/"))
+            }
+            return shellDoubleQuote(path)
+        }
+
+        private fun shellDoubleQuote(value: String): String = buildString(value.length + 2) {
+            append('"')
+            for (c in value) {
+                when (c) {
+                    '\\', '"', '`' -> {
+                        append('\\')
+                        append(c)
+                    }
+                    else -> append(c)
+                }
+            }
+            append('"')
         }
     }
 }

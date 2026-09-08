@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -407,7 +406,6 @@ private fun FilingCabinetTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val corner = 8.dp
     val stroke = 1.dp
     val background = if (selected) {
         MaterialTheme.colorScheme.surface
@@ -431,13 +429,7 @@ private fun FilingCabinetTab(
             modifier = Modifier
                 .matchParentSize()
                 .padding(bottom = stroke)
-                .background(
-                    color = background,
-                    shape = RoundedCornerShape(
-                        topStart = if (drawLeadingEdge) corner else 0.dp,
-                        topEnd = corner,
-                    ),
-                ),
+                .background(color = background),
         )
         Text(
             text = label,
@@ -450,18 +442,16 @@ private fun FilingCabinetTab(
                 .drawBehind {
                     val strokePx = stroke.toPx()
                     val inset = strokePx / 2f
-                    val radius = corner.toPx()
                     val path = Path()
                     if (drawLeadingEdge) {
                         path.moveTo(inset, size.height)
-                        path.lineTo(inset, radius)
-                        path.quadraticTo(inset, inset, radius, inset)
+                        path.lineTo(inset, inset)
+                        path.lineTo(size.width - inset, inset)
                     } else {
                         // Previous tab owns the shared wall; start along the top edge.
                         path.moveTo(0f, inset)
+                        path.lineTo(size.width - inset, inset)
                     }
-                    path.lineTo(size.width - radius, inset)
-                    path.quadraticTo(size.width - inset, inset, size.width - inset, radius)
                     path.lineTo(size.width - inset, size.height)
                     drawPath(
                         path = path,

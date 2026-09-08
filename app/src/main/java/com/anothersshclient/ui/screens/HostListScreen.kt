@@ -55,6 +55,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -88,20 +89,30 @@ fun HostListScreen(
     val fabFocused by fabInteraction.collectIsFocusedAsState()
     val fabShape = FloatingActionButtonDefaults.shape
     var didInitialFocus by remember { mutableStateOf(false) }
+    val windowInfo = LocalWindowInfo.current
 
-    LaunchedEffect(hostsState) {
+    LaunchedEffect(hostsState, windowInfo.isWindowFocused) {
         if (didInitialFocus) return@LaunchedEffect
         val loaded = hostsState ?: return@LaunchedEffect
+        if (!windowInfo.isWindowFocused) return@LaunchedEffect
         if (showEditor || pendingDelete != null) return@LaunchedEffect
-        withFrameNanos { }
-        if (loaded.isEmpty()) {
-            fabFocusRequester.requestFocus()
-        } else {
-            listState.scrollToItem(1)
+
+        // Wait until focus targets are attached; retry a few frames for cold start.
+        repeat(5) {
             withFrameNanos { }
-            firstHostFocusRequester.requestFocus()
+            try {
+                if (loaded.isEmpty()) {
+                    fabFocusRequester.requestFocus()
+                } else {
+                    listState.scrollToItem(1)
+                    firstHostFocusRequester.requestFocus()
+                }
+                didInitialFocus = true
+                return@LaunchedEffect
+            } catch (_: IllegalStateException) {
+                // FocusRequester not attached yet; try again next frame.
+            }
         }
-        didInitialFocus = true
     }
 
     Scaffold(

@@ -313,7 +313,10 @@ fun HostListScreen(
                                 },
                                 contentColor = MaterialTheme.colorScheme.onSurface,
                             ),
-                            modifier = Modifier.focusProperties { canFocus = false },
+                            // TopAppBar already pads actions by 4.dp; list rows use 16.dp end inset.
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .focusProperties { canFocus = false },
                         ) {
                             Text("Back to session")
                         }

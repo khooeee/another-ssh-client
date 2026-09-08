@@ -5,16 +5,13 @@ import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -42,7 +39,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -322,7 +324,8 @@ private fun FilingCabinetTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)
+    val corner = 8.dp
+    val stroke = 1.dp
     val background = if (selected) {
         MaterialTheme.colorScheme.surface
     } else {
@@ -330,36 +333,56 @@ private fun FilingCabinetTab(
     }
     val outline = MaterialTheme.colorScheme.outline
 
-    Box(
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .zIndex(if (selected) 1f else 0f)
             .clickable(onClick = onClick)
-            .focusProperties { canFocus = false },
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .background(background, shape)
-                .border(1.dp, outline, shape)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-        )
-        if (selected) {
-            // Cover the tab's own bottom border so it opens into the terminal.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 1.dp)
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.surface),
+            .focusProperties { canFocus = false }
+            .background(
+                color = background,
+                shape = RoundedCornerShape(topStart = corner, topEnd = corner),
             )
-        }
-    }
+            .drawBehind {
+                val strokePx = stroke.toPx()
+                val inset = strokePx / 2f
+                val radius = corner.toPx()
+                val path = Path()
+                if (selected) {
+                    // Left + rounded top + right only — no bottom edge.
+                    path.moveTo(inset, size.height)
+                    path.lineTo(inset, radius)
+                    path.quadraticTo(inset, inset, radius, inset)
+                    path.lineTo(size.width - radius, inset)
+                    path.quadraticTo(size.width - inset, inset, size.width - inset, radius)
+                    path.lineTo(size.width - inset, size.height)
+                } else {
+                    path.addRoundRect(
+                        RoundRect(
+                            left = inset,
+                            top = inset,
+                            right = size.width - inset,
+                            bottom = size.height - inset,
+                            topLeftCornerRadius = CornerRadius(radius),
+                            topRightCornerRadius = CornerRadius(radius),
+                            bottomLeftCornerRadius = CornerRadius.Zero,
+                            bottomRightCornerRadius = CornerRadius.Zero,
+                        ),
+                    )
+                }
+                drawPath(
+                    path = path,
+                    color = outline,
+                    style = Stroke(width = strokePx),
+                )
+            }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    )
 }
 
 private fun startSession(

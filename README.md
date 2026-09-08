@@ -1,22 +1,12 @@
-# Another SSH Client — SSH for Daylight DC-1
+# Another SSH Client
 
-Native Kotlin / Jetpack Compose SSH client aimed at Daylight's greyscale Live Paper display.
-Password auth via pure Java [sshj](https://github.com/hierynomus/sshj). Terminal rendering via
-vendored Termux `terminal-view` / `terminal-emulator` (Apache-2.0). Sideload the APK (no Play Store).
+Native Kotlin / Jetpack Compose SSH client aimed at Daylight DC-1's greyscale Live Paper display.
 
-## Features (v0.2)
+## Features
 
-- Saved hosts (name, host, port, user)
-- Optional Keystore-encrypted saved password per host
-- Real VT/xterm terminal (char-at-a-time input, cursor control, TUIs / coding agents)
-- Window resize forwarded to the remote PTY
-- Greyscale “paper” color scheme for Live Paper
+- Multiple concurrent sessions
+- Ctrl+Tab / Ctrl+Shift+Tab to cycle sessions
 - Pinch-to-zoom font size
-
-## Architecture
-
-- **sshj** — SSH connect, auth, shell, window-change
-- **Termux terminal-*** — VT emulator + `TerminalView` only (no local Termux shell / OpenSSH)
 
 ## Build
 

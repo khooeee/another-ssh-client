@@ -73,9 +73,7 @@ fun HostListScreen(
                 actions = {
                     if (openSessionCount > 0) {
                         TextButton(onClick = onOpenSessions) {
-                            Text(
-                                if (openSessionCount == 1) "1 session" else "$openSessionCount sessions",
-                            )
+                            Text("Back to session")
                         }
                     }
                 },

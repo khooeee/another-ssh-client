@@ -78,6 +78,7 @@ import kotlin.coroutines.resume
 
 private sealed interface HostListSelection {
     data object Fab : HostListSelection
+    data object BackToSession : HostListSelection
     data class Host(val index: Int) : HostListSelection
 }
 
@@ -132,7 +133,7 @@ fun HostListScreen(
                 val id = hosts.getOrNull(selected.index)?.id ?: return
                 viewModel.rememberSelection(RememberedHostSelection.Host(id))
             }
-            null -> Unit
+            HostListSelection.BackToSession, null -> Unit
         }
     }
 
@@ -158,12 +159,25 @@ fun HostListScreen(
         }
         val current = selection
         selection = when {
-            loaded.isEmpty() -> HostListSelection.Fab
+            loaded.isEmpty() && current is HostListSelection.Host -> HostListSelection.Fab
             current is HostListSelection.Host && current.index >= loaded.size -> {
                 HostListSelection.Host(loaded.lastIndex)
             }
+            current is HostListSelection.BackToSession && openSessionCount <= 0 -> {
+                if (loaded.isEmpty()) HostListSelection.Fab else HostListSelection.Host(0)
+            }
             current == null -> selectionFromRemembered(loaded)
             else -> current
+        }
+    }
+
+    LaunchedEffect(openSessionCount) {
+        if (openSessionCount <= 0 && selection is HostListSelection.BackToSession) {
+            selection = if (hosts.isEmpty()) {
+                HostListSelection.Fab
+            } else {
+                HostListSelection.Host(0)
+            }
         }
     }
 
@@ -194,6 +208,13 @@ fun HostListScreen(
 
     fun moveSelectionDown() {
         when (val current = selection) {
+            HostListSelection.BackToSession -> {
+                selection = if (hosts.isNotEmpty()) {
+                    HostListSelection.Host(0)
+                } else {
+                    HostListSelection.Fab
+                }
+            }
             is HostListSelection.Host -> {
                 selection = if (current.index < hosts.lastIndex) {
                     HostListSelection.Host(current.index + 1)
@@ -210,14 +231,18 @@ fun HostListScreen(
             HostListSelection.Fab -> {
                 if (hosts.isNotEmpty()) {
                     selection = HostListSelection.Host(hosts.lastIndex)
+                } else if (openSessionCount > 0) {
+                    selection = HostListSelection.BackToSession
                 }
             }
             is HostListSelection.Host -> {
-                if (current.index > 0) {
-                    selection = HostListSelection.Host(current.index - 1)
+                selection = when {
+                    current.index > 0 -> HostListSelection.Host(current.index - 1)
+                    openSessionCount > 0 -> HostListSelection.BackToSession
+                    else -> current
                 }
             }
-            null -> Unit
+            HostListSelection.BackToSession, null -> Unit
         }
     }
 
@@ -227,6 +252,7 @@ fun HostListScreen(
                 editing = null
                 showEditor = true
             }
+            HostListSelection.BackToSession -> onOpenSessions()
             is HostListSelection.Host -> {
                 hosts.getOrNull(current.index)?.let(onConnect)
             }
@@ -269,9 +295,26 @@ fun HostListScreen(
                 },
                 actions = {
                     if (openSessionCount > 0) {
+                        val backSelected = selection is HostListSelection.BackToSession
                         TextButton(
-                            onClick = onOpenSessions,
-                            modifier = Modifier.focusProperties { canFocus = false },
+                            onClick = {
+                                selection = HostListSelection.BackToSession
+                                onOpenSessions()
+                            },
+                            colors = ButtonDefaults.textButtonColors(
+                                containerColor = if (backSelected) {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            modifier = Modifier
+                                .focusProperties { canFocus = false }
+                                .border(
+                                    width = if (backSelected) 3.dp else 0.dp,
+                                    color = MaterialTheme.colorScheme.outline,
+                                ),
                         ) {
                             Text("Back to session")
                         }

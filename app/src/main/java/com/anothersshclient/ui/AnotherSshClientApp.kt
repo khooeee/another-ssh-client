@@ -10,7 +10,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.anothersshclient.AnotherSshClientApplication
-import com.anothersshclient.data.ThemeMode
 import com.anothersshclient.ui.screens.HostListScreen
 import com.anothersshclient.ui.screens.SessionScreen
 
@@ -20,10 +19,7 @@ private object Routes {
 }
 
 @Composable
-fun AnotherSshClientApp(
-    themeMode: ThemeMode,
-    onCycleThemeMode: () -> Unit,
-) {
+fun AnotherSshClientApp() {
     val navController = rememberNavController()
     val context = LocalContext.current
     val app = remember(context) { context.applicationContext as AnotherSshClientApplication }
@@ -50,8 +46,6 @@ fun AnotherSshClientApp(
             HostListScreen(
                 viewModel = hostListViewModel,
                 openSessionCount = openSessions.size,
-                themeMode = themeMode,
-                onCycleThemeMode = onCycleThemeMode,
                 onConnect = { profile ->
                     sessionManager.queueOpen(profile)
                     goToSessions()

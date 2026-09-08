@@ -13,7 +13,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.anothersshclient.data.ThemeMode
 
 // High-contrast greyscale tuned for Daylight Live Paper.
 private val PaperWhite = Color(0xFFFFFFFF)
@@ -107,32 +106,14 @@ private val PaperTypography = Typography(
     ),
 )
 
-val LocalThemeMode = staticCompositionLocalOf { ThemeMode.Light }
-
 val LocalTerminalTheme = staticCompositionLocalOf { TerminalTheme.Light }
 
-fun ThemeMode.resolveDark(isSystemDark: Boolean): Boolean = when (this) {
-    ThemeMode.Light -> false
-    ThemeMode.Dark -> true
-    ThemeMode.System -> isSystemDark
-}
-
-fun ThemeMode.toTerminalTheme(isSystemDark: Boolean): TerminalTheme =
-    if (resolveDark(isSystemDark)) TerminalTheme.Dark else TerminalTheme.Light
-
 @Composable
-fun AnotherSshClientTheme(
-    themeMode: ThemeMode = ThemeMode.Light,
-    content: @Composable () -> Unit,
-) {
-    val systemDark = isSystemInDarkTheme()
-    val darkTheme = themeMode.resolveDark(systemDark)
-    val terminalTheme = themeMode.toTerminalTheme(systemDark)
+fun AnotherSshClientTheme(content: @Composable () -> Unit) {
+    val darkTheme = isSystemInDarkTheme()
+    val terminalTheme = if (darkTheme) TerminalTheme.Dark else TerminalTheme.Light
 
-    CompositionLocalProvider(
-        LocalThemeMode provides themeMode,
-        LocalTerminalTheme provides terminalTheme,
-    ) {
+    CompositionLocalProvider(LocalTerminalTheme provides terminalTheme) {
         MaterialTheme(
             colorScheme = if (darkTheme) PaperDarkColorScheme else PaperLightColorScheme,
             typography = PaperTypography,

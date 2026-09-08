@@ -67,7 +67,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
-import com.anothersshclient.data.ThemeMode
 import com.anothersshclient.ui.HostListViewModel
 import com.anothersshclient.ui.components.TypewriterBrandTitle
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -83,8 +82,6 @@ private sealed interface HostListSelection {
 fun HostListScreen(
     viewModel: HostListViewModel,
     openSessionCount: Int = 0,
-    themeMode: ThemeMode,
-    onCycleThemeMode: () -> Unit,
     onConnect: (HostProfile) -> Unit,
     onOpenSessions: () -> Unit = {},
 ) {
@@ -225,12 +222,6 @@ fun HostListScreen(
                     TypewriterBrandTitle()
                 },
                 actions = {
-                    TextButton(
-                        onClick = onCycleThemeMode,
-                        modifier = Modifier.focusProperties { canFocus = false },
-                    ) {
-                        Text(themeMode.label)
-                    }
                     if (openSessionCount > 0) {
                         TextButton(
                             onClick = onOpenSessions,

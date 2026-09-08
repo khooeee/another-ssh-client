@@ -63,7 +63,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -77,7 +76,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.anothersshclient.data.TerminalPreferences
 import com.anothersshclient.session.OpenSession
 import com.anothersshclient.session.PendingOpen
 import com.anothersshclient.session.SessionManager
@@ -85,7 +83,6 @@ import com.anothersshclient.ssh.SshTransport
 import com.anothersshclient.terminal.AppTerminalClients
 import com.anothersshclient.terminal.NoOpTerminalSessionClient
 import com.anothersshclient.ui.theme.LocalTerminalTheme
-import com.anothersshclient.ui.theme.LocalThemeMode
 import com.anothersshclient.ui.theme.TerminalTheme
 import com.termux.terminal.TerminalColors
 import com.termux.terminal.TerminalSession
@@ -109,9 +106,6 @@ fun SessionScreen(
     val active = sessions.find { it.id == activeId }
     val terminalTheme = LocalTerminalTheme.current
     val terminalThemeLatest = rememberUpdatedState(terminalTheme)
-    val themeMode = LocalThemeMode.current
-    val context = LocalContext.current
-    val appearancePrefs = remember(context) { TerminalPreferences(context) }
 
     var awaitingPasswordFor by remember { mutableStateOf<PendingOpen?>(null) }
     var isStarting by remember { mutableStateOf(false) }
@@ -221,12 +215,6 @@ fun SessionScreen(
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
-                    }
-                    TextButton(
-                        onClick = { appearancePrefs.themeMode = themeMode.next() },
-                        modifier = Modifier.focusProperties { canFocus = false },
-                    ) {
-                        Text(themeMode.label)
                     }
                     TextButton(
                         onClick = { leaveToNewSession() },

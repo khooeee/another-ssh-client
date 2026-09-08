@@ -101,11 +101,15 @@ fun SessionScreen(
 
     val onLeaveLatest = rememberUpdatedState(onLeaveToHosts)
 
-    BackHandler {
+    fun leaveToNewSession() {
         sessionManager.clearPending()
         awaitingPasswordFor = null
         isStarting = false
         onLeaveLatest.value()
+    }
+
+    BackHandler {
+        leaveToNewSession()
     }
 
     LaunchedEffect(sessions.size) {
@@ -146,9 +150,18 @@ fun SessionScreen(
     Scaffold(
         modifier = Modifier.onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            if (event.key != Key.Tab || !event.isCtrlPressed) return@onPreviewKeyEvent false
-            sessionManager.selectAdjacent(forward = !event.isShiftPressed)
-            true
+            if (!event.isCtrlPressed) return@onPreviewKeyEvent false
+            when {
+                event.key == Key.Tab -> {
+                    sessionManager.selectAdjacent(forward = !event.isShiftPressed)
+                    true
+                }
+                event.key == Key.N && event.isShiftPressed -> {
+                    leaveToNewSession()
+                    true
+                }
+                else -> false
+            }
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -180,12 +193,7 @@ fun SessionScreen(
                         }
                     }
                     TextButton(
-                        onClick = {
-                            sessionManager.clearPending()
-                            awaitingPasswordFor = null
-                            isStarting = false
-                            onLeaveToHosts()
-                        },
+                        onClick = { leaveToNewSession() },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
                         Text("New Session")
@@ -311,9 +319,20 @@ fun SessionScreen(
                                 e: KeyEvent,
                                 session: TerminalSession,
                             ): Boolean {
-                                if (keyCode == KeyEvent.KEYCODE_TAB && e.isCtrlPressed) {
-                                    sessionManager.selectAdjacent(forward = !e.isShiftPressed)
-                                    return true
+                                if (!e.isCtrlPressed) {
+                                    return baseClients.onKeyDown(keyCode, e, session)
+                                }
+                                when (keyCode) {
+                                    KeyEvent.KEYCODE_TAB -> {
+                                        sessionManager.selectAdjacent(forward = !e.isShiftPressed)
+                                        return true
+                                    }
+                                    KeyEvent.KEYCODE_N -> {
+                                        if (e.isShiftPressed) {
+                                            leaveToNewSession()
+                                            return true
+                                        }
+                                    }
                                 }
                                 return baseClients.onKeyDown(keyCode, e, session)
                             }

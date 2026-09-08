@@ -1,6 +1,9 @@
 package com.anothersshclient.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,7 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -22,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,9 +43,18 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,6 +63,7 @@ import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
 import com.anothersshclient.ui.HostListViewModel
 import com.anothersshclient.ui.components.TypewriterBrandTitle
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +77,13 @@ fun HostListScreen(
     var editing by remember { mutableStateOf<HostProfile?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<HostProfile?>(null) }
+
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val lastHostFocusRequester = remember { FocusRequester() }
+    val fabInteraction = remember { MutableInteractionSource() }
+    val fabFocused by fabInteraction.collectIsFocusedAsState()
+    val fabShape = FloatingActionButtonDefaults.shape
 
     Scaffold(
         topBar = {
@@ -88,8 +110,44 @@ fun HostListScreen(
                     editing = null
                     showEditor = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                interactionSource = fabInteraction,
+                shape = fabShape,
+                containerColor = if (fabFocused) {
+                    MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                contentColor = if (fabFocused) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onPrimary
+                },
+                elevation = FloatingActionButtonDefaults.elevation(
+                    defaultElevation = 0.dp,
+                    pressedElevation = 0.dp,
+                    focusedElevation = 0.dp,
+                    hoveredElevation = 0.dp,
+                ),
+                modifier = Modifier
+                    .border(
+                        width = if (fabFocused) 3.dp else 1.dp,
+                        color = MaterialTheme.colorScheme.outline,
+                        shape = fabShape,
+                    )
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (event.key != Key.DirectionUp) {
+                            return@onPreviewKeyEvent false
+                        }
+                        if (hosts.isEmpty()) return@onPreviewKeyEvent false
+                        scope.launch {
+                            // LazyColumn index 0 is the top divider; hosts start at 1.
+                            listState.scrollToItem(hosts.size)
+                            withFrameNanos { }
+                            lastHostFocusRequester.requestFocus()
+                        }
+                        true
+                    },
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add host")
             }
@@ -113,17 +171,23 @@ fun HostListScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             ) {
                 item {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 }
-                items(hosts, key = { it.id }) { host ->
+                itemsIndexed(hosts, key = { _, host -> host.id }) { index, host ->
                     HostRow(
                         host = host,
+                        rowFocusRequester = if (index == hosts.lastIndex) {
+                            lastHostFocusRequester
+                        } else {
+                            null
+                        },
                         onOpen = { onConnect(host) },
                         onEdit = {
                             editing = host
@@ -189,10 +253,18 @@ private fun HostRow(
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    rowFocusRequester: FocusRequester? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (rowFocusRequester != null) {
+                    Modifier.focusRequester(rowFocusRequester)
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onOpen)
             .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,

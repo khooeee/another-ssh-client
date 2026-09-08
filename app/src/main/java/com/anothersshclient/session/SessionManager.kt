@@ -76,6 +76,20 @@ class SessionManager {
         }
     }
 
+    /** Cycle the active session. No-op with fewer than two sessions; still safe to call. */
+    fun selectAdjacent(forward: Boolean) {
+        val list = _sessions.value
+        if (list.size < 2) return
+        val idx = list.indexOfFirst { it.id == _activeId.value }
+        if (idx < 0) return
+        val next = if (forward) {
+            (idx + 1) % list.size
+        } else {
+            (idx - 1 + list.size) % list.size
+        }
+        _activeId.value = list[next].id
+    }
+
     fun register(
         pending: PendingOpen,
         terminalSession: TerminalSession,

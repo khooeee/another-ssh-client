@@ -1,6 +1,7 @@
 package com.anothersshclient.ui.screens
 
 import android.graphics.Typeface
+import android.view.KeyEvent
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -39,6 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
@@ -120,6 +128,12 @@ fun SessionScreen(
     }
 
     Scaffold(
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            if (event.key != Key.Tab || !event.isCtrlPressed) return@onPreviewKeyEvent false
+            sessionManager.selectAdjacent(forward = !event.isShiftPressed)
+            true
+        },
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Column(
@@ -237,6 +251,18 @@ fun SessionScreen(
                                 applyPaperScheme(terminal)
                                 baseClients.onEmulatorSet()
                                 view.requestFocus()
+                            }
+
+                            override fun onKeyDown(
+                                keyCode: Int,
+                                e: KeyEvent,
+                                session: TerminalSession,
+                            ): Boolean {
+                                if (keyCode == KeyEvent.KEYCODE_TAB && e.isCtrlPressed) {
+                                    sessionManager.selectAdjacent(forward = !e.isShiftPressed)
+                                    return true
+                                }
+                                return baseClients.onKeyDown(keyCode, e, session)
                             }
                         }
                         view.setTerminalViewClient(viewClient)

@@ -69,6 +69,7 @@ public final class TerminalView extends View {
     /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
     int mTopRow;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
+    private final int[] mSearchSelectors = new int[]{-1,-1,-1,-1};
 
     float mScaleFactor = 1.f;
     final GestureAndScaleRecognizer mGestureRecognizer;
@@ -1079,8 +1080,10 @@ public final class TerminalView extends View {
         } else {
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;
-            if (mTextSelectionCursorController != null) {
+            if (isSelectingText()) {
                 mTextSelectionCursorController.getSelectors(sel);
+            } else if (mSearchSelectors[2] >= 0) {
+                sel = mSearchSelectors;
             }
 
             mRenderer.render(mEmulator, canvas, mTopRow, sel[0], sel[1], sel[2], sel[3]);
@@ -1123,6 +1126,26 @@ public final class TerminalView extends View {
 
     public void setTopRow(int mTopRow) {
         this.mTopRow = mTopRow;
+    }
+
+    /** Highlight and reveal one find-in-scrollback result. */
+    public void showSearchResult(int startColumn, int row, int endColumn) {
+        mSearchSelectors[0] = row;
+        mSearchSelectors[1] = row;
+        mSearchSelectors[2] = startColumn;
+        mSearchSelectors[3] = endColumn;
+        if (mEmulator != null) {
+            int historyRows = mEmulator.getScreen().getActiveTranscriptRows();
+            mTopRow = Math.max(-historyRows, Math.min(0, row - (mEmulator.mRows / 2)));
+            scrollTo(0, mTopRow);
+        }
+        invalidate();
+    }
+
+    /** Remove the find highlight without changing the user's scroll position. */
+    public void clearSearchResult() {
+        mSearchSelectors[0] = mSearchSelectors[1] = mSearchSelectors[2] = mSearchSelectors[3] = -1;
+        invalidate();
     }
 
 

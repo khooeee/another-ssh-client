@@ -32,12 +32,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,6 +96,7 @@ import com.anothersshclient.ui.components.ExtraKeysBar
 import com.anothersshclient.ui.theme.LocalTerminalTheme
 import com.anothersshclient.ui.theme.TerminalTheme
 import com.termux.terminal.TerminalColors
+import com.termux.terminal.TerminalBuffer
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.TerminalView
@@ -119,9 +126,16 @@ fun SessionScreen(
     var isStarting by remember { mutableStateOf(false) }
     var hadLiveSession by remember { mutableStateOf(false) }
     var renamingSession by remember { mutableStateOf<OpenSession?>(null) }
+    var findVisible by remember { mutableStateOf(false) }
+    var findQuery by remember { mutableStateOf(TextFieldValue("")) }
+    var findMatches by remember { mutableStateOf<List<TerminalBuffer.SearchMatch>>(emptyList()) }
+    var findMatchIndex by remember { mutableStateOf(0) }
+    var terminalRevision by remember { mutableStateOf(0) }
+    val findFocusRequester = remember { FocusRequester() }
     val extraKeys = remember { ExtraKeysState() }
     var terminalViewRef by remember { mutableStateOf<TerminalView?>(null) }
     val renamingLatest = rememberUpdatedState(renamingSession)
+    val findVisibleLatest = rememberUpdatedState(findVisible)
     val showExtraKeys = rememberSoftKeyboardVisible()
 
     LaunchedEffect(showExtraKeys) {
@@ -137,8 +151,51 @@ fun SessionScreen(
         onLeaveLatest.value()
     }
 
+    fun closeFind() {
+        findVisible = false
+        findMatches = emptyList()
+        findMatchIndex = 0
+        terminalViewRef?.clearSearchResult()
+        terminalViewRef?.requestFocus()
+    }
+
+    fun moveFindResult(forward: Boolean) {
+        if (findMatches.isEmpty()) return
+        findMatchIndex = if (forward) {
+            (findMatchIndex + 1) % findMatches.size
+        } else {
+            (findMatchIndex - 1 + findMatches.size) % findMatches.size
+        }
+    }
+
     BackHandler {
-        leaveToNewSession()
+        if (findVisible) closeFind() else leaveToNewSession()
+    }
+
+    LaunchedEffect(findVisible) {
+        if (findVisible) findFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(findVisible, findQuery.text, activeId, terminalRevision, terminalViewRef) {
+        if (!findVisible || findQuery.text.isEmpty()) {
+            findMatches = emptyList()
+            findMatchIndex = 0
+            terminalViewRef?.clearSearchResult()
+            return@LaunchedEffect
+        }
+        val screen = active?.terminalSession?.emulator?.screen
+        findMatches = screen?.findAll(findQuery.text, false)?.toList().orEmpty()
+        findMatchIndex = findMatchIndex.coerceIn(0, (findMatches.size - 1).coerceAtLeast(0))
+    }
+
+    LaunchedEffect(findVisible, findMatches, findMatchIndex, terminalViewRef) {
+        val view = terminalViewRef ?: return@LaunchedEffect
+        val match = findMatches.getOrNull(findMatchIndex)
+        if (findVisible && match != null) {
+            view.showSearchResult(match.startColumn, match.row, match.endColumn)
+        } else {
+            view.clearSearchResult()
+        }
     }
 
     LaunchedEffect(sessions.size) {
@@ -200,6 +257,10 @@ fun SessionScreen(
                     active?.let { renamingSession = it }
                     true
                 }
+                event.key == Key.F && event.isShiftPressed -> {
+                    findVisible = true
+                    true
+                }
                 else -> false
             }
         },
@@ -243,6 +304,13 @@ fun SessionScreen(
                         }
                     }
                     TextButton(
+                        onClick = { findVisible = true },
+                        enabled = active != null,
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
+                        Text("Find")
+                    }
+                    TextButton(
                         onClick = { leaveToNewSession() },
                         modifier = Modifier.focusProperties { canFocus = false },
                     ) {
@@ -257,6 +325,22 @@ fun SessionScreen(
                     ) {
                         Text("Disconnect")
                     }
+                }
+
+                if (findVisible && active != null) {
+                    TerminalFindBar(
+                        query = findQuery,
+                        matchIndex = findMatchIndex,
+                        matchCount = findMatches.size,
+                        focusRequester = findFocusRequester,
+                        onQueryChange = {
+                            findQuery = it
+                            findMatchIndex = 0
+                        },
+                        onPrevious = { moveFindResult(forward = false) },
+                        onNext = { moveFindResult(forward = true) },
+                        onClose = { closeFind() },
+                    )
                 }
 
                 if (sessions.isNotEmpty()) {
@@ -383,13 +467,16 @@ fun SessionScreen(
                                 context = ctx,
                                 terminalView = view,
                                 onFinished = { finished -> sessionManager.onTerminalFinished(finished) },
+                                onTerminalChanged = {
+                                    if (findVisibleLatest.value) terminalRevision++
+                                },
                                 extraKeys = extraKeys,
                             )
                             val viewClient = object : TerminalViewClient by baseClients {
                                 override fun onEmulatorSet() {
                                     applyTerminalScheme(terminal, terminalThemeLatest.value)
                                     baseClients.onEmulatorSet()
-                                    if (renamingLatest.value == null) {
+                                    if (renamingLatest.value == null && !findVisibleLatest.value) {
                                         view.requestFocus()
                                     }
                                 }
@@ -405,6 +492,13 @@ fun SessionScreen(
                                         return baseClients.onKeyDown(keyCode, e, session)
                                     }
                                     when (keyCode) {
+                                        KeyEvent.KEYCODE_F -> {
+                                            if (shift) {
+                                                findVisible = true
+                                                extraKeys.consumeOneShot()
+                                                return true
+                                            }
+                                        }
                                         KeyEvent.KEYCODE_TAB -> {
                                             sessionManager.selectAdjacent(forward = !shift)
                                             extraKeys.consumeOneShot()
@@ -445,7 +539,7 @@ fun SessionScreen(
                         update = { view ->
                             terminalViewRef = view
                             // Don't steal focus from rename dialog / other chrome.
-                            if (renamingLatest.value == null && !view.hasFocus()) {
+                            if (renamingLatest.value == null && !findVisibleLatest.value && !view.hasFocus()) {
                                 view.requestFocus()
                             }
                         },
@@ -512,6 +606,66 @@ fun SessionScreen(
                 renamingSession = null
             },
         )
+    }
+}
+
+@Composable
+private fun TerminalFindBar(
+    query: TextFieldValue,
+    matchIndex: Int,
+    matchCount: Int,
+    focusRequester: FocusRequester,
+    onQueryChange: (TextFieldValue) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = SessionChromePaddingHorizontal, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            label = { Text("Find in scrollback") },
+            singleLine = true,
+            trailingIcon = {
+                Text(
+                    if (query.text.isEmpty()) "" else "${if (matchCount == 0) 0 else matchIndex + 1}/$matchCount",
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onNext() }),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Escape -> {
+                            onClose()
+                            true
+                        }
+                        Key.Enter, Key.NumPadEnter -> {
+                            if (event.isShiftPressed) onPrevious() else onNext()
+                            true
+                        }
+                        else -> false
+                    }
+                },
+        )
+        IconButton(onClick = onPrevious, enabled = matchCount > 0) {
+            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous match")
+        }
+        IconButton(onClick = onNext, enabled = matchCount > 0) {
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next match")
+        }
+        IconButton(onClick = onClose) {
+            Icon(Icons.Default.Close, contentDescription = "Close find")
+        }
     }
 }
 

@@ -207,7 +207,6 @@ private fun HostRow(
             Text(
                 buildString {
                     append("${host.username}@${host.host}:${host.port}")
-                    if (host.hasPassword) append("  ·  saved password")
                     if (liveSessionCount > 0) {
                         append("  ·  ")
                         append(if (liveSessionCount == 1) "1 open" else "$liveSessionCount open")

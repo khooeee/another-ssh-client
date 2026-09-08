@@ -1,9 +1,9 @@
 package com.anothersshclient.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,19 +43,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -64,7 +64,13 @@ import com.anothersshclient.data.HostProfile
 import com.anothersshclient.data.HostRepository
 import com.anothersshclient.ui.HostListViewModel
 import com.anothersshclient.ui.components.TypewriterBrandTitle
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+
+private sealed interface HostListSelection {
+    data object Fab : HostListSelection
+    data class Host(val index: Int) : HostListSelection
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,48 +87,130 @@ fun HostListScreen(
     var pendingDelete by remember { mutableStateOf<HostProfile?>(null) }
 
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val firstHostFocusRequester = remember { FocusRequester() }
-    val lastHostFocusRequester = remember { FocusRequester() }
-    val fabFocusRequester = remember { FocusRequester() }
-    val fabInteraction = remember { MutableInteractionSource() }
-    val fabFocused by fabInteraction.collectIsFocusedAsState()
+    val screenFocusRequester = remember { FocusRequester() }
     val fabShape = FloatingActionButtonDefaults.shape
-    var didInitialFocus by remember { mutableStateOf(false) }
-    val windowInfo = LocalWindowInfo.current
+    val view = LocalView.current
 
-    LaunchedEffect(hostsState, windowInfo.isWindowFocused) {
-        if (didInitialFocus) return@LaunchedEffect
+    var selection by remember { mutableStateOf<HostListSelection?>(null) }
+    var didInitialSelection by remember { mutableStateOf(false) }
+
+    // App-owned selection: do not rely on Compose focus, which is flaky on cold start.
+    LaunchedEffect(hostsState) {
         val loaded = hostsState ?: return@LaunchedEffect
-        if (!windowInfo.isWindowFocused) return@LaunchedEffect
-        if (showEditor || pendingDelete != null) return@LaunchedEffect
+        if (!didInitialSelection) {
+            selection = if (loaded.isEmpty()) {
+                HostListSelection.Fab
+            } else {
+                HostListSelection.Host(0)
+            }
+            didInitialSelection = true
+            return@LaunchedEffect
+        }
+        val current = selection
+        selection = when {
+            loaded.isEmpty() -> HostListSelection.Fab
+            current is HostListSelection.Host && current.index >= loaded.size -> {
+                HostListSelection.Host(loaded.lastIndex)
+            }
+            current == null -> HostListSelection.Host(0)
+            else -> current
+        }
+    }
 
-        // Wait until focus targets are attached; retry a few frames for cold start.
-        repeat(5) {
+    LaunchedEffect(selection) {
+        val selected = selection as? HostListSelection.Host ?: return@LaunchedEffect
+        listState.scrollToItem(selected.index + 1)
+    }
+
+    LaunchedEffect(didInitialSelection, showEditor, pendingDelete) {
+        if (!didInitialSelection || showEditor || pendingDelete != null) return@LaunchedEffect
+        view.isFocusable = true
+        view.isFocusableInTouchMode = true
+        awaitWindowFocus(view)
+        repeat(10) {
             withFrameNanos { }
             try {
-                if (loaded.isEmpty()) {
-                    fabFocusRequester.requestFocus()
-                } else {
-                    listState.scrollToItem(1)
-                    firstHostFocusRequester.requestFocus()
-                }
-                didInitialFocus = true
+                screenFocusRequester.requestFocus()
                 return@LaunchedEffect
             } catch (_: IllegalStateException) {
-                // FocusRequester not attached yet; try again next frame.
+                // Not attached yet.
             }
         }
     }
 
+    val dialogOpen = showEditor || pendingDelete != null
+    val fabSelected = selection is HostListSelection.Fab
+
+    fun moveSelectionDown() {
+        when (val current = selection) {
+            is HostListSelection.Host -> {
+                selection = if (current.index < hosts.lastIndex) {
+                    HostListSelection.Host(current.index + 1)
+                } else {
+                    HostListSelection.Fab
+                }
+            }
+            HostListSelection.Fab, null -> Unit
+        }
+    }
+
+    fun moveSelectionUp() {
+        when (val current = selection) {
+            HostListSelection.Fab -> {
+                if (hosts.isNotEmpty()) {
+                    selection = HostListSelection.Host(hosts.lastIndex)
+                }
+            }
+            is HostListSelection.Host -> {
+                if (current.index > 0) {
+                    selection = HostListSelection.Host(current.index - 1)
+                }
+            }
+            null -> Unit
+        }
+    }
+
+    fun activateSelection() {
+        when (val current = selection) {
+            HostListSelection.Fab -> {
+                editing = null
+                showEditor = true
+            }
+            is HostListSelection.Host -> {
+                hosts.getOrNull(current.index)?.let(onConnect)
+            }
+            null -> Unit
+        }
+    }
+
     Scaffold(
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-            if (event.key != Key.Escape) return@onPreviewKeyEvent false
-            if (openSessionCount <= 0) return@onPreviewKeyEvent false
-            onOpenSessions()
-            true
-        },
+        modifier = Modifier
+            .focusRequester(screenFocusRequester)
+            .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                if (dialogOpen) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.Escape -> {
+                        if (openSessionCount <= 0) return@onPreviewKeyEvent false
+                        onOpenSessions()
+                        true
+                    }
+                    Key.DirectionDown -> {
+                        moveSelectionDown()
+                        true
+                    }
+                    Key.DirectionUp -> {
+                        moveSelectionUp()
+                        true
+                    }
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                        activateSelection()
+                        true
+                    }
+                    else -> false
+                }
+            },
         topBar = {
             TopAppBar(
                 title = {
@@ -130,7 +218,10 @@ fun HostListScreen(
                 },
                 actions = {
                     if (openSessionCount > 0) {
-                        TextButton(onClick = onOpenSessions) {
+                        TextButton(
+                            onClick = onOpenSessions,
+                            modifier = Modifier.focusProperties { canFocus = false },
+                        ) {
                             Text("Back to session")
                         }
                     }
@@ -144,17 +235,17 @@ fun HostListScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = {
+                    selection = HostListSelection.Fab
                     editing = null
                     showEditor = true
                 },
-                interactionSource = fabInteraction,
                 shape = fabShape,
-                containerColor = if (fabFocused) {
+                containerColor = if (fabSelected) {
                     MaterialTheme.colorScheme.surface
                 } else {
                     MaterialTheme.colorScheme.primary
                 },
-                contentColor = if (fabFocused) {
+                contentColor = if (fabSelected) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
                     MaterialTheme.colorScheme.onPrimary
@@ -166,30 +257,12 @@ fun HostListScreen(
                     hoveredElevation = 0.dp,
                 ),
                 modifier = Modifier
-                    .focusRequester(fabFocusRequester)
+                    .focusProperties { canFocus = false }
                     .border(
-                        width = if (fabFocused) 3.dp else 1.dp,
+                        width = if (fabSelected) 3.dp else 1.dp,
                         color = MaterialTheme.colorScheme.outline,
                         shape = fabShape,
-                    )
-                    .onPreviewKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                        if (event.key != Key.DirectionUp) {
-                            return@onPreviewKeyEvent false
-                        }
-                        if (hosts.isEmpty()) return@onPreviewKeyEvent false
-                        scope.launch {
-                            // LazyColumn index 0 is the top divider; hosts start at 1.
-                            listState.scrollToItem(hosts.size)
-                            withFrameNanos { }
-                            if (hosts.size == 1) {
-                                firstHostFocusRequester.requestFocus()
-                            } else {
-                                lastHostFocusRequester.requestFocus()
-                            }
-                        }
-                        true
-                    },
+                    ),
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add host")
             }
@@ -216,28 +289,30 @@ fun HostListScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(padding)
+                    .focusProperties { canFocus = false },
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             ) {
                 item {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline, thickness = 1.dp)
                 }
                 itemsIndexed(hosts, key = { _, host -> host.id }) { index, host ->
-                    val rowFocusRequester = when {
-                        hosts.size == 1 -> firstHostFocusRequester
-                        index == 0 -> firstHostFocusRequester
-                        index == hosts.lastIndex -> lastHostFocusRequester
-                        else -> null
-                    }
                     HostRow(
                         host = host,
-                        rowFocusRequester = rowFocusRequester,
-                        onOpen = { onConnect(host) },
+                        selected = selection == HostListSelection.Host(index),
+                        onOpen = {
+                            selection = HostListSelection.Host(index)
+                            onConnect(host)
+                        },
                         onEdit = {
+                            selection = HostListSelection.Host(index)
                             editing = host
                             showEditor = true
                         },
-                        onDelete = { pendingDelete = host },
+                        onDelete = {
+                            selection = HostListSelection.Host(index)
+                            pendingDelete = host
+                        },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 }
@@ -294,20 +369,18 @@ fun HostListScreen(
 @Composable
 private fun HostRow(
     host: HostProfile,
+    selected: Boolean,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    rowFocusRequester: FocusRequester? = null,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (rowFocusRequester != null) {
-                    Modifier.focusRequester(rowFocusRequester)
-                } else {
-                    Modifier
-                },
+            .focusProperties { canFocus = false }
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceVariant
+                else MaterialTheme.colorScheme.surface,
             )
             .clickable(onClick = onOpen)
             .padding(vertical = 14.dp),
@@ -320,10 +393,16 @@ private fun HostRow(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        IconButton(onClick = onEdit) {
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.focusProperties { canFocus = false },
+        ) {
             Icon(Icons.Default.Edit, contentDescription = "Edit")
         }
-        IconButton(onClick = onDelete) {
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.focusProperties { canFocus = false },
+        ) {
             Icon(Icons.Default.Delete, contentDescription = "Delete")
         }
     }
@@ -462,4 +541,25 @@ private fun HostEditorDialog(
         },
         containerColor = MaterialTheme.colorScheme.surface,
     )
+}
+
+private suspend fun awaitWindowFocus(view: android.view.View) {
+    if (view.hasWindowFocus()) return
+    suspendCancellableCoroutine { cont ->
+        val listener = object : android.view.ViewTreeObserver.OnWindowFocusChangeListener {
+            override fun onWindowFocusChanged(hasFocus: Boolean) {
+                if (!hasFocus) return
+                view.viewTreeObserver.removeOnWindowFocusChangeListener(this)
+                if (cont.isActive) cont.resume(Unit)
+            }
+        }
+        view.viewTreeObserver.addOnWindowFocusChangeListener(listener)
+        cont.invokeOnCancellation {
+            view.viewTreeObserver.removeOnWindowFocusChangeListener(listener)
+        }
+        if (view.hasWindowFocus()) {
+            view.viewTreeObserver.removeOnWindowFocusChangeListener(listener)
+            if (cont.isActive) cont.resume(Unit)
+        }
+    }
 }

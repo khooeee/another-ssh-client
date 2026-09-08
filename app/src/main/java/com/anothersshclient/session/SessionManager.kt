@@ -15,8 +15,6 @@ data class OpenSession(
     val host: String,
     val port: Int,
     val username: String,
-    /** 1-based index among sessions for the same host profile. */
-    val ordinal: Int,
     @Volatile var terminalSession: TerminalSession? = null,
 )
 
@@ -62,10 +60,7 @@ class SessionManager {
         _pendingOpen.value = null
     }
 
-    fun label(session: OpenSession): String {
-        val peers = _sessions.value.count { it.hostProfileId == session.hostProfileId }
-        return if (peers > 1) "${session.title} · ${session.ordinal}" else session.title
-    }
+    fun label(session: OpenSession): String = session.title
 
     fun rename(id: String, newTitle: String) {
         val trimmed = newTitle.trim()
@@ -119,15 +114,13 @@ class SessionManager {
         pending: PendingOpen,
         terminalSession: TerminalSession,
     ): OpenSession {
-        val ordinal = _sessions.value.count { it.hostProfileId == pending.hostProfileId } + 1
         val open = OpenSession(
             id = UUID.randomUUID().toString(),
             hostProfileId = pending.hostProfileId,
-            title = pending.title,
+            title = uniqueTitle(pending.title),
             host = pending.host,
             port = pending.port,
             username = pending.username,
-            ordinal = ordinal,
             terminalSession = terminalSession,
         )
         _sessions.update { it + open }
@@ -158,6 +151,21 @@ class SessionManager {
 
     fun sessionCountForHost(hostProfileId: String): Int =
         _sessions.value.count { it.hostProfileId == hostProfileId }
+
+    private fun uniqueTitle(base: String): String {
+        val root = base.trim().ifEmpty { "Session" }
+        if (_sessions.value.none { it.title.equals(root, ignoreCase = true) }) {
+            return root
+        }
+        var n = 2
+        while (true) {
+            val candidate = "$root $n"
+            if (_sessions.value.none { it.title.equals(candidate, ignoreCase = true) }) {
+                return candidate
+            }
+            n++
+        }
+    }
 
     private fun remove(id: String) {
         _sessions.update { list -> list.filterNot { it.id == id } }

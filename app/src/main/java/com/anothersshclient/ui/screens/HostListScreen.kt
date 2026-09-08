@@ -105,6 +105,13 @@ fun HostListScreen(
     }
 
     Scaffold(
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            if (event.key != Key.Escape) return@onPreviewKeyEvent false
+            if (openSessionCount <= 0) return@onPreviewKeyEvent false
+            onOpenSessions()
+            true
+        },
         topBar = {
             TopAppBar(
                 title = {

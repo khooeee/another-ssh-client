@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -234,7 +233,6 @@ fun SessionScreen(
                                     selected = selected,
                                     onClick = { sessionManager.setActive(session.id) },
                                     modifier = Modifier
-                                        .widthIn(min = 72.dp)
                                         .offset(x = if (index > 0) (-1).dp else 0.dp)
                                         .onGloballyPositioned { tabCoords ->
                                             if (!selected) return@onGloballyPositioned

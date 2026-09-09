@@ -62,4 +62,26 @@ public class ScreenBufferTest extends TerminalTestCase {
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(1, 2));
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(2, 2));
 	}
+
+	public void testFindAll() {
+		withTerminalSized(12, 3).enterString("Hello hello\r\nbanana");
+		TerminalBuffer.SearchMatch[] matches = mTerminal.getScreen().findAll("hello", false);
+		assertEquals(2, matches.length);
+		assertEquals(0, matches[0].row);
+		assertEquals(0, matches[0].startColumn);
+		assertEquals(4, matches[0].endColumn);
+		assertEquals(6, matches[1].startColumn);
+
+		matches = mTerminal.getScreen().findAll("ana", true);
+		assertEquals(2, matches.length);
+		assertEquals(1, matches[0].row);
+		assertEquals(1, matches[0].startColumn);
+		assertEquals(3, matches[0].endColumn);
+		assertEquals(3, matches[1].startColumn);
+		assertEquals(5, matches[1].endColumn);
+
+		assertEquals(2, mTerminal.getScreen().findAll("Hello", false).length);
+		assertEquals(1, mTerminal.getScreen().findAll("Hello", true).length);
+		assertEquals(0, mTerminal.getScreen().findAll("", false).length);
+	}
 }

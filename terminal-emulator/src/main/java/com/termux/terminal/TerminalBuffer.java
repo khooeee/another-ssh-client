@@ -1,6 +1,8 @@
 package com.termux.terminal;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * A circular buffer of {@link TerminalRow}:s which keeps notes about what is visible on a logical screen and the scroll
@@ -9,6 +11,19 @@ import java.util.Arrays;
  * See {@link #externalToInternalRow(int)} for how to map from logical screen rows to array indices.
  */
 public final class TerminalBuffer {
+
+    /** A case-sensitive or case-insensitive text match in external terminal coordinates. */
+    public static final class SearchMatch {
+        public final int row;
+        public final int startColumn;
+        public final int endColumn;
+
+        SearchMatch(int row, int startColumn, int endColumn) {
+            this.row = row;
+            this.startColumn = startColumn;
+            this.endColumn = endColumn;
+        }
+    }
 
     TerminalRow[] mLines;
     /** The length of {@link #mLines}. */
@@ -47,6 +62,48 @@ public final class TerminalBuffer {
 
     public String getTranscriptTextWithFullLinesJoined() {
         return getSelectedText(0, -getActiveTranscriptRows(), mColumns, mScreenRows, true, true).trim();
+    }
+
+    /**
+     * Find every occurrence of {@code query} in the scrollback and visible screen.
+     * Matches are returned from oldest to newest and never span a displayed row.
+     */
+    public SearchMatch[] findAll(String query, boolean matchCase) {
+        if (query == null || query.isEmpty()) return new SearchMatch[0];
+
+        List<SearchMatch> matches = new ArrayList<>();
+        for (int row = -getActiveTranscriptRows(); row < mScreenRows; row++) {
+            TerminalRow lineObject = mLines[externalToInternalRow(row)];
+            String line = getSelectedText(0, row, mColumns, row, false);
+            int fromIndex = 0;
+            while (fromIndex <= line.length() - query.length()) {
+                int charIndex = indexOf(line, query, fromIndex, matchCase);
+                if (charIndex < 0) break;
+
+                int startColumn = columnForCharIndex(lineObject, charIndex);
+                int endColumn = Math.max(startColumn, columnForCharIndex(lineObject, charIndex + query.length()) - 1);
+                matches.add(new SearchMatch(row, startColumn, endColumn));
+                // Advance one character so overlapping matches (for example "ana" in "banana") are included.
+                fromIndex = charIndex + 1;
+            }
+        }
+        return matches.toArray(new SearchMatch[0]);
+    }
+
+    private static int indexOf(String text, String query, int fromIndex, boolean matchCase) {
+        if (matchCase) return text.indexOf(query, fromIndex);
+        int lastStart = text.length() - query.length();
+        for (int i = fromIndex; i <= lastStart; i++) {
+            if (text.regionMatches(true, i, query, 0, query.length())) return i;
+        }
+        return -1;
+    }
+
+    private int columnForCharIndex(TerminalRow row, int charIndex) {
+        for (int column = 0; column <= mColumns; column++) {
+            if (row.findStartOfColumn(column) >= charIndex) return column;
+        }
+        return mColumns;
     }
 
     public String getSelectedText(int selX1, int selY1, int selX2, int selY2) {

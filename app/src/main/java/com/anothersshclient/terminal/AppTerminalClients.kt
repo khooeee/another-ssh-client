@@ -16,6 +16,7 @@ class AppTerminalClients(
     private val context: Context,
     private val terminalView: TerminalView,
     private val onFinished: (TerminalSession) -> Unit,
+    private val onTerminalChanged: () -> Unit = {},
     private val extraKeys: ExtraKeysState = ExtraKeysState(),
     private val preferences: TerminalPreferences = TerminalPreferences(context),
 ) : TerminalViewClient, TerminalSessionClient {
@@ -83,6 +84,7 @@ class AppTerminalClients(
     override fun onTextChanged(changedSession: TerminalSession) {
         if (!terminalView.isAttachedToWindow) return
         terminalView.onScreenUpdated()
+        terminalView.post { onTerminalChanged() }
     }
 
     override fun onTitleChanged(changedSession: TerminalSession) = Unit

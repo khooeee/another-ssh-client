@@ -117,6 +117,7 @@ fun SessionScreen(
 ) {
     val sessions by sessionManager.sessions.collectAsStateWithLifecycle()
     val activeId by sessionManager.activeId.collectAsStateWithLifecycle()
+    val idleIds by sessionManager.idleIds.collectAsStateWithLifecycle()
     val pendingFlow by sessionManager.pendingOpen.collectAsStateWithLifecycle()
     val active = sessions.find { it.id == activeId }
     val terminalTheme = LocalTerminalTheme.current
@@ -374,6 +375,7 @@ fun SessionScreen(
                                     FilingCabinetTab(
                                         label = sessionManager.label(session),
                                         selected = selected,
+                                        idle = session.id in idleIds,
                                         isDragging = isDragging,
                                         // Share side walls: only the first tab draws a leading edge.
                                         drawLeadingEdge = index == 0,
@@ -468,6 +470,7 @@ fun SessionScreen(
                                 terminalView = view,
                                 onFinished = { finished -> sessionManager.onTerminalFinished(finished) },
                                 onTerminalChanged = {
+                                    sessionManager.onTerminalActivity(terminal)
                                     if (findVisibleLatest.value) terminalRevision++
                                 },
                                 extraKeys = extraKeys,
@@ -674,6 +677,7 @@ private fun TerminalFindBar(
 private fun FilingCabinetTab(
     label: String,
     selected: Boolean,
+    idle: Boolean,
     isDragging: Boolean,
     drawLeadingEdge: Boolean,
     onClick: () -> Unit,
@@ -688,6 +692,12 @@ private fun FilingCabinetTab(
         MaterialTheme.colorScheme.surfaceVariant
     }
     val outline = MaterialTheme.colorScheme.outline
+    // Selected tabs always use normal ink; idle only dims unselected titles.
+    val titleColor = if (selected || !idle) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.outlineVariant
+    }
 
     Box(
         modifier = modifier
@@ -717,7 +727,7 @@ private fun FilingCabinetTab(
             text = label,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = titleColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
@@ -855,6 +865,10 @@ private fun startSession(
         transport,
         /* transcriptRows */ 2000,
         object : TerminalSessionClient by NoOpTerminalSessionClient {
+            override fun onTextChanged(changedSession: TerminalSession) {
+                sessionManager.onTerminalActivity(changedSession)
+            }
+
             override fun onSessionFinished(finishedSession: TerminalSession) {
                 sessionManager.onTerminalFinished(finishedSession)
             }

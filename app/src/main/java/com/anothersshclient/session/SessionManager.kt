@@ -1,5 +1,7 @@
 package com.anothersshclient.session
 
+import android.os.Handler
+import android.os.Looper
 import com.anothersshclient.data.HostProfile
 import com.termux.terminal.TerminalSession
 import java.util.UUID
@@ -41,6 +43,13 @@ class SessionManager {
     private val _pendingOpen = MutableStateFlow<PendingOpen?>(null)
     val pendingOpen: StateFlow<PendingOpen?> = _pendingOpen.asStateFlow()
 
+    /** Session ids quiet for [IDLE_TIMEOUT_MS]; selected tabs still render normal title color. */
+    private val _idleIds = MutableStateFlow<Set<String>>(emptySet())
+    val idleIds: StateFlow<Set<String>> = _idleIds.asStateFlow()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val idleRunnables = mutableMapOf<String, Runnable>()
+
     fun queueOpen(profile: HostProfile) {
         _pendingOpen.value = PendingOpen(
             hostProfileId = profile.id,
@@ -63,6 +72,28 @@ class SessionManager {
     }
 
     fun label(session: OpenSession): String = session.title
+
+    /** Output or input observed — clear idle and restart the quiet timer. */
+    fun onTerminalActivity(terminal: TerminalSession) {
+        val id = _sessions.value.find { it.terminalSession === terminal }?.id ?: return
+        onSessionActivity(id)
+    }
+
+    fun onSessionActivity(id: String) {
+        if (_sessions.value.none { it.id == id }) return
+        if (id in _idleIds.value) {
+            _idleIds.update { it - id }
+        }
+        idleRunnables.remove(id)?.let { mainHandler.removeCallbacks(it) }
+        val markIdle = Runnable {
+            if (_sessions.value.any { it.id == id }) {
+                _idleIds.update { it + id }
+            }
+            idleRunnables.remove(id)
+        }
+        idleRunnables[id] = markIdle
+        mainHandler.postDelayed(markIdle, IDLE_TIMEOUT_MS)
+    }
 
     fun rename(id: String, newTitle: String) {
         val trimmed = newTitle.trim()
@@ -138,6 +169,7 @@ class SessionManager {
         )
         _sessions.update { it + open }
         _activeId.value = open.id
+        onSessionActivity(open.id)
         return open
     }
 
@@ -184,6 +216,8 @@ class SessionManager {
         val list = _sessions.value
         val index = list.indexOfFirst { it.id == id }
         val wasActive = _activeId.value == id
+        idleRunnables.remove(id)?.let { mainHandler.removeCallbacks(it) }
+        _idleIds.update { it - id }
         _sessions.update { sessions -> sessions.filterNot { it.id == id } }
         if (!wasActive || index < 0) return
         val remaining = _sessions.value
@@ -193,5 +227,9 @@ class SessionManager {
         }
         // Prefer the tab that shifted into this index (former next); if we closed the last, take previous.
         _activeId.value = remaining.getOrNull(index)?.id ?: remaining.last().id
+    }
+
+    companion object {
+        private const val IDLE_TIMEOUT_MS = 60_000L
     }
 }

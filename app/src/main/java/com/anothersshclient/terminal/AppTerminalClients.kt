@@ -73,6 +73,7 @@ class AppTerminalClients(
     override fun readFnKey(): Boolean = false
 
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession): Boolean {
+        onTerminalChanged()
         // Soft-keyboard input already observed sticky mods via read*Key(); clear one-shot after.
         if (extraKeys.anyActive) {
             terminalView.post { extraKeys.consumeOneShot() }
@@ -82,9 +83,11 @@ class AppTerminalClients(
     override fun onEmulatorSet() = Unit
 
     override fun onTextChanged(changedSession: TerminalSession) {
-        if (!terminalView.isAttachedToWindow) return
-        terminalView.onScreenUpdated()
-        terminalView.post { onTerminalChanged() }
+        // Background sessions keep this client after the view is destroyed; still report activity.
+        if (terminalView.isAttachedToWindow) {
+            terminalView.onScreenUpdated()
+        }
+        onTerminalChanged()
     }
 
     override fun onTitleChanged(changedSession: TerminalSession) = Unit

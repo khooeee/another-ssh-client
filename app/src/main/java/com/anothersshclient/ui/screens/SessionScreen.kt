@@ -54,6 +54,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -692,15 +693,11 @@ private fun FilingCabinetTab(
         MaterialTheme.colorScheme.surfaceVariant
     }
     val outline = MaterialTheme.colorScheme.outline
-    // Selected tabs always use normal ink; idle only dims unselected titles.
-    val titleColor = if (selected || !idle) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.outlineVariant
-    }
+    val titleColor = MaterialTheme.colorScheme.onSurface
 
     Box(
         modifier = modifier
+            .alpha(if (idle && !selected) 0.55f else 1f)
             .zIndex(when {
                 isDragging -> 3f
                 selected -> 2f

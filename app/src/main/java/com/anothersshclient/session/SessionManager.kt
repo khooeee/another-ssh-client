@@ -43,7 +43,7 @@ class SessionManager {
     private val _pendingOpen = MutableStateFlow<PendingOpen?>(null)
     val pendingOpen: StateFlow<PendingOpen?> = _pendingOpen.asStateFlow()
 
-    /** Session ids quiet for [IDLE_TIMEOUT_MS]; selected tabs still render normal title color. */
+    /** Session ids quiet for [IDLE_TIMEOUT_MS]. */
     private val _idleIds = MutableStateFlow<Set<String>>(emptySet())
     val idleIds: StateFlow<Set<String>> = _idleIds.asStateFlow()
 
